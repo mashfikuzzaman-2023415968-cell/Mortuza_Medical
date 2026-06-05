@@ -1,0 +1,73 @@
+7:05 PMClaude responded: Here's the complete breakdown for every role — what they see, and what they can do (view / create / edit / delete) on each page.Architected comprehensive role-based UI feature matrix with granular permissionsArchitected comprehensive role-based UI feature matrix with granular permissionsHere's the complete breakdown for every role — what they see, and what they can do (view / create / edit / delete) on each page.
+
+ADMIN (full unrestricted access)
+
+Dashboard — view summary stats: total patients, today's visits, today's revenue, bed occupancy, ambulance status, doctor workload ranking.
+Doctors — view full doctor list with type/unit/phone. Create new doctor. Edit doctor details. Delete doctor (only if no visits/roster linked).
+Units — view all medical units. Create new unit. Edit unit name/type/floor. Delete unit (only if no doctors/tokens assigned).
+Duty Roster — view weekly roster table (doctor × shift × unit × date). Create new roster assignment. Edit assignment. Delete assignment.
+Patients — view all patients with search/filter by category. View any patient's full profile. Edit patient info. (No delete — medical records are permanent.)
+Health Cards — view all cards. Issue card for a patient (create). Change card status: activate / suspend / expire (edit).
+Medicines — view full stock list. Create new medicine. Edit stock quantity / price / reorder level. Delete medicine (only if never prescribed).
+Diagnostic Tests — view test catalogue. Create new test type. Edit test details (normal range, available days).
+Beds — view all 30 beds with occupancy status (derived). No direct edit — occupancy changes through admissions.
+Ambulances — view fleet with live status. Edit ambulance status (IN_SERVICE / MAINTENANCE / RETIRED). Edit driver info.
+Ambulance Dispatch — view full dispatch log. Create new dispatch. Mark dispatch as returned (edit return_datetime + status=COMPLETED). Cancel a dispatch.
+App Users — view all user accounts. Create new user (assign role, link to doctor/patient). Activate / deactivate user (edit). Reset password.
+Reports — view dispensary revenue (daily breakdown + totals), doctor workload (visits + prescriptions per doctor), bed occupancy (occupied/free by ward), ambulance utilisation (trips + avg duration per vehicle). All read-only.
+
+
+RECEPTIONIST
+
+Dashboard — view: registered patients count, tokens issued today, active health cards count. Quick-action buttons to jump to register/token/card pages.
+Patients — view patient list with search by name/ID/category. Create: register new patient (fill full form including conditional guardian for FAMILY). Edit: update patient phone/email/address. No delete.
+Health Cards — view all cards with status and expiry. Create: issue a new card for a patient who doesn't have one (pick patient, set expiry, mark photo submitted). Edit: suspend / activate / expire a card.
+Token Queue — view today's token queue grouped by unit, with status badges (WAITING / SERVED / CANCELLED). Create: issue a new token (select patient + unit; server validates active card and computes next token number). No edit or delete on tokens.
+Duty Roster — view only (check which doctor is on duty in which unit/shift today). No create/edit/delete.
+Ambulance — view ambulance live status (in service, on trip, maintenance). Create: log a new ambulance dispatch (select ambulance, optional patient, destination, trip type, requested by).
+
+
+DOCTOR
+
+Dashboard — view: waiting count in own unit, patients seen today, prescriptions written today. Shows the live token queue below.
+Token Queue — view today's WAITING tokens for their assigned unit only. Each token has a "Start visit" button. No create/edit/delete on tokens.
+Visits — view list of own visits (ones they conducted). Create: start a new visit from a WAITING token (form: vitals, complaint, diagnosis) OR create an emergency visit without a token (visit_type=EMERGENCY, select patient directly). Edit: update diagnosis / follow-up date on a past visit. No delete.
+Prescriptions — view own prescriptions. Create: write a new prescription linked to a visit (advice, next visit date, and repeatable item rows: medicine, dosage, duration, quantity, instruction — add/remove items). No edit after creation (prescriptions are final). No delete.
+Test Orders — view tests they ordered with status and results. Create: order a new diagnostic test for a patient (select test from catalogue). No edit on orders (lab tech enters results). No delete.
+Admissions — view current bed/ward status and admitted patients. Create: admit a patient to the isolation ward (select patient, enter disease — bed auto-assigned by server). Edit: discharge a patient (set discharge_datetime + status=DISCHARGED). No delete.
+
+
+PHARMACIST
+
+Dashboard — view: total medicines count, low-stock alert count, today's dispensary revenue. Shows the dispense queue below.
+Dispense Queue — view list of prescriptions that haven't been fully dispensed. Each shows patient name, doctor, date, and item details. Create: dispense medicine (for each prescription item, enter dispensed quantity; server runs the transaction — stock check, charge computation, stock decrement). No edit after dispense (dispense records are final). No delete.
+Medicine Stock — view full inventory table (name, generic, form, strength, price, stock, reorder level, status). Create: add a new medicine to inventory. Edit: update stock quantity, unit price, reorder level. Delete: only medicines that have never been prescribed.
+Low Stock Alerts — view medicines where stock < reorder level (highlighted in red). This is a filtered view, not a separate table.
+Dispense Log — view all past dispenses: patient, category, items dispensed, amount charged (Free for students/homeo, cost price for teachers/staff), dispensed by whom. Read-only.
+
+
+LAB TECH
+
+Dashboard — view: pending test count, completed test count today, total catalogue size.
+Pending Tests — view test orders with status ORDERED or SAMPLE_COLLECTED. Each shows patient, test name, category, ordering doctor, date. No create — doctors order tests.
+Enter Results — edit a test order: mark sample_collected_at (datetime), change status to SAMPLE_COLLECTED or COMPLETED, enter result_value, set result_date, add remarks. This is the core action — updating the test order, not creating a new record. No delete.
+Test Catalogue — view the diagnostic test list (test name, category, sample type, normal range, available days). Read-only for lab tech — admin manages the catalogue.
+
+
+PATIENT (read-only on everything, own data only)
+
+Overview — view: own profile (name, category, department, university ID), health card status and expiry, summary counts (visits, prescriptions, tests).
+Visit History — view own visits only: date, doctor name, visit type, complaint, diagnosis, vitals (BP, temperature, weight, pulse), follow-up date. No create/edit/delete.
+Prescriptions — view own prescriptions only: date, prescribing doctor, advice, medicine items with dosage/duration/quantity/instruction. No create/edit/delete.
+Test Results — view own test orders only: test name, category, status, result value (when completed), date. No create/edit/delete.
+Health Card — view own card: card number, issue date, expiry date, status (ACTIVE/EXPIRED/SUSPENDED). Visual card display. No edit — receptionist manages cards.
+
+
+actions:
+Admin: Dashboard (stats + ambulance fleet + workload chart) → Doctors (full table with edit/delete buttons per row + add button) → Duty roster (schedule table with shift badges, edit/delete per row + add) → Ambulances (fleet cards with edit-status buttons + dispatch log with "Mark returned" on active trips + new dispatch) → Reports (daily revenue breakdown, bed occupancy bar with admitted patients, app users table with edit).
+Receptionist: Dashboard (stats + quick-action buttons that jump to sub-pages) → Patients (searchable table with edit buttons + register form with all fields including conditional guardian) → Health cards (issue form + all-cards table with "Change status" buttons) → Token queue (issue form + live queue with status badges) → Ambulance (dispatch form).
+Doctor: Dashboard (stats + live queue with "Start visit" buttons) → Token queue (standalone queue + start visit) → clicking "Start visit" opens the Visit form → "Save & write prescription" opens the Prescription form with add/remove item rows → My visits (history table with edit buttons, note: no delete) → Test orders (table with order-new button) → Admissions (admit form + bed table with discharge buttons on occupied beds).
+Pharmacist: Dashboard (stats + dispense queue below) → Dispense (prescription cards with item details + dispense buttons) → Stock (full inventory with edit buttons per row + add button, low-stock highlighted) → Low stock (red alert banner + dispense log with free/charged breakdown, note: no delete on records).
+Lab Tech: Dashboard (stats + pending list) → Pending tests (cards with enter-result buttons) → Enter results (form: sample datetime, status dropdown, result field, remarks) → Catalogue (read-only test table, note: managed by admin).
+Patient: Overview (profile card + health card badge + stats) → Visits (own history, read-only label) → Prescriptions (own prescriptions with items, read-only) → Test results (own tests with status/results, read-only) → Health card (visual card with gradient background showing number, expiry, status).
+The actions match exactly what I listed earlier — edit/delete buttons only appear where allowed, medical records show "no delete" notes, patient pages are marked read-only, and admin has the most controls. Use this as the reference design for Copilot to replicate with real API calls.
