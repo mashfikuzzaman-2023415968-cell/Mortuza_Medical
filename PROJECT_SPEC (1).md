@@ -1,4 +1,13 @@
 # Mortuza Medical Centre Management System (MMCMS)
+# Mortuza Medical Centre Management System (MMCMS)
+# Mortuza Medical Centre Management System (MMCMS)
+# Mortuza Medical Centre Management System (MMCMS)
+# Mortuza Medical Centre Management System (MMCMS)
+# Mortuza Medical Centre Management System (MMCMS)
+# Mortuza Medical Centre Management System (MMCMS)
+# Mortuza Medical Centre Management System (MMCMS)
+# Mortuza Medical Centre Management System (MMCMS)
+# Mortuza Medical Centre Management System (MMCMS)
 ### CSE-2201 Database Management System — 2nd Year 2nd Semester Lab Project
 **Stack:** PostgreSQL (database) · Node.js + Express (REST API) · React (frontend)
 
@@ -1490,16 +1499,351 @@ PATIENT:
 
 ## 12. Build Order (instructions for the AI assistant)
 
-1. Create the Postgres database; run `01_schema.sql`, then `03_seed.sql`, then `04_views.sql`.
-2. Verify all 22 queries in `05_queries.sql` return rows.
-3. Scaffold `server/` following Section 10.1: install packages (10.1.1), create `.env` (10.1.2),
-   implement auth (10.1.3), standard response format (10.1.4), then all routes with the role-guard
-   middleware from the access matrix. Implement the three critical endpoints exactly as described
-   in 10.1.5 (token issuance, dispense transaction, admission). Use parameterized queries only.
-4. Scaffold `client/` (Vite + React + Tailwind): install packages (10.1.1), set up axios with
-   JWT interceptor (10.1.3), implement the route table (10.1.6), and build each page/form using
-   the field specifications in 10.1.6.
-5. Wire role-based login and the report pages to the database views.
-6. Keep the database the centre of gravity — business rules (card validity, free-vs-paid medicine,
-   stock decrement, isolation-ward restriction, ambulance availability) enforced in SQL constraints
-   + server transactions, not just the UI.
+Build the project in **phases**, one at a time. Complete and test each phase before starting
+the next. Each phase is a self-contained vertical slice — its own backend endpoints, its own
+frontend pages — small enough to get right in one pass. The phases follow the natural dependency
+order of the patient journey: you can't issue a token without a patient, can't write a
+prescription without a visit, can't dispense without a prescription.
+
+**IMPORTANT:** after each phase, manually test every endpoint and page before proceeding. Fix
+bugs in the current phase first — don't carry broken code forward.
+
+---
+
+### Phase 0 — Database setup (run once)
+
+Create the PostgreSQL database and load the SQL files in order:
+```
+psql -U postgres -c "CREATE DATABASE mmcms;"
+psql -U postgres -d mmcms -f db/01_schema.sql
+psql -U postgres -d mmcms -f db/03_seed.sql
+psql -U postgres -d mmcms -f db/04_views.sql
+```
+Verify with: `psql -U postgres -d mmcms -f db/05_queries.sql` — all 22 queries should return rows.
+This phase is done once and never touched again unless the schema changes.
+
+---
+
+### Phase 1 — Authentication + landing page
+
+**This phase produces a working login screen with role-based routing. No data pages yet — just
+the skeleton that every future phase plugs into.**
+
+**Backend:**
+1. Initialize `server/` — `npm init`, install packages (Section 10.1.1): `express`, `pg`, `cors`,
+   `dotenv`, `bcryptjs`, `jsonwebtoken`.
+2. Create `server/.env` from Section 10.1.2.
+3. Create `server/src/config/db.js` — a `pg.Pool` using the env variables. Export the pool.
+4. Create `server/src/middleware/auth.js` — two functions:
+   - `verifyToken(req, res, next)` — reads `Authorization: Bearer <token>` from the header,
+     verifies with `jwt.verify`, attaches `{ user_id, role, doctor_id, patient_id }` to `req.user`.
+     Returns 401 on failure.
+   - `authorize(...allowedRoles)` — returns a middleware that checks `req.user.role` is in the
+     list OR is `'ADMIN'` (admin always passes). Returns 403 on failure.
+5. Create `server/src/routes/auth.js` — one route:
+   - `POST /api/auth/login` — follows Section 10.1.3 exactly: query `app_user` by username →
+     bcrypt.compare → sign JWT with `{ user_id, role, doctor_id, patient_id }` → return
+     `{ success: true, token, user: { user_id, username, role } }`.
+6. Create `server/src/app.js` — Express app with `cors()`, `express.json()`, mounts
+   `/api/auth` router, listens on `PORT`.
+7. **Before proceeding, fix the seed passwords:** write a one-time script (`db/fix_passwords.js`)
+   that updates `app_user.password_hash` with real bcrypt hashes for each seed user. Run it once.
+   Suggested passwords for dev: `admin123`, `doctor123`, `reception123`, `pharma123`, `lab123`,
+   `patient123`.
+
+**Frontend:**
+1. Initialize `client/` — `npm create vite@latest client -- --template react`, install packages
+   (Section 10.1.1): `react-router-dom`, `axios`, `tailwindcss`, `autoprefixer`, `postcss`.
+   Configure Tailwind.
+2. Create `client/src/api/axios.js` — axios instance with `baseURL: 'http://localhost:5000/api'`,
+   request interceptor that attaches `Authorization: Bearer` from localStorage, response
+   interceptor that clears token and redirects to `/login` on 401.
+3. Create `client/src/pages/LoginPage.jsx` — the login form (username + password fields + submit
+   button). On success, store token in localStorage, decode the role, redirect to the role's
+   dashboard route.
+4. Create `client/src/App.jsx` — reads token from localStorage. If no token → show `<LoginPage>`.
+   If token → decode role → render a `<DashboardLayout>` with the role's sidebar nav items
+   (from Section 10.1.6 route table) and a `<Routes>` block. For now, each role's routes can
+   render a placeholder `<div>Coming soon</div>` — the real pages are built in later phases.
+5. Create `client/src/components/DashboardLayout.jsx` — the sidebar + header + content area
+   shell. Sidebar shows nav items based on the role. Header shows role name, username, sign-out
+   button. Sign-out clears localStorage and redirects to `/login`.
+
+**Test this phase:**
+- Start the backend (`node src/app.js`) and frontend (`npm run dev`).
+- Open the app → see login page → log in as `admin` / `admin123` → land on admin dashboard
+  shell with sidebar → sign out → back to login.
+- Log in as each of the 6 roles → verify each lands on the correct shell with the correct
+  sidebar items.
+- Try a wrong password → see error message.
+- Try accessing a page without logging in → redirected to login.
+
+---
+
+### Phase 2 — Receptionist (patient registration, health cards, tokens)
+
+**Why first:** the receptionist creates patients and tokens — every other role depends on this
+data existing. Build this before any clinical features.
+
+**Backend — add these route files:**
+- `routes/patients.js`:
+  - `GET /api/patients` — list all patients (with search by name/category). Accessible by:
+    ADMIN, RECEPTIONIST, DOCTOR.
+  - `POST /api/patients` — register new patient. Accessible by: ADMIN, RECEPTIONIST.
+  - `GET /api/patients/:id` — get one patient's full profile.
+  - `PUT /api/patients/:id` — update patient info. Accessible by: ADMIN, RECEPTIONIST.
+- `routes/health-cards.js`:
+  - `POST /api/health-cards` — issue a card. Accessible by: ADMIN, RECEPTIONIST.
+  - `PUT /api/health-cards/:id/status` — change status (ACTIVE/SUSPENDED/EXPIRED). Accessible
+    by: ADMIN, RECEPTIONIST.
+  - `GET /api/health-cards/patient/:patientId` — get a patient's card.
+- `routes/tokens.js`:
+  - `POST /api/tokens` — issue a token. **Implement the token issuance logic from Section
+    10.1.5 A exactly** (validate active card → compute next number → insert). Accessible by:
+    ADMIN, RECEPTIONIST.
+  - `GET /api/tokens?date=&unit_id=` — get tokens for a date/unit. Accessible by: ADMIN,
+    RECEPTIONIST, DOCTOR.
+
+**Frontend — build these pages (Section 10.1.6 fields + route table):**
+- `/reception` → ReceptionDashboard (stat cards: patient count, tokens today, active cards +
+  quick-action buttons linking to the sub-pages).
+- `/reception/patients` → PatientList (searchable table) + RegisterPatientForm (modal or
+  separate view with all fields from 10.1.6, including conditional guardian dropdown visible
+  only when category = FAMILY). Each row has an Edit button.
+- `/reception/patients/:id` → PatientDetail + EditPatientForm.
+- `/reception/health-cards` → IssueHealthCardForm (patient dropdown showing only patients
+  without a card, expiry date picker, photo checkbox) + AllCardsTable with "Change status"
+  buttons.
+- `/reception/tokens` → IssueTokenForm (patient dropdown + unit dropdown) + TodayTokenQueue
+  (list with token number badges, unit, time, WAITING/SERVED/CANCELLED status).
+
+**Test:** register a new patient → issue them a card → issue a token → see it appear in the
+queue. Try issuing a token for a patient with an expired card → see the error. Try issuing a
+token for a patient with no card → see the error.
+
+---
+
+### Phase 3 — Doctor (visits, prescriptions, test orders, admissions)
+
+**Why second:** the doctor consumes tokens (from Phase 2) and produces visits, prescriptions,
+and test orders that Phases 4 and 5 consume.
+
+**Backend — add these route files:**
+- `routes/visits.js`:
+  - `POST /api/visits` — create a visit (from a WAITING token, or emergency with no token).
+    Mark the token as SERVED. Accessible by: ADMIN, DOCTOR.
+  - `GET /api/visits/:id` — get visit details. Accessible by: ADMIN, DOCTOR, PATIENT (own only).
+  - `PUT /api/visits/:id` — update diagnosis / follow-up. Accessible by: ADMIN, DOCTOR.
+  - `GET /api/visits?patient_id=` — list visits. DOCTOR sees own, PATIENT sees own.
+- `routes/prescriptions.js`:
+  - `POST /api/prescriptions` — create prescription + prescription_items in one request (send
+    items as a JSON array in the body). Accessible by: ADMIN, DOCTOR.
+  - `GET /api/prescriptions/:id` — get prescription with items. Accessible by: ADMIN, DOCTOR,
+    PHARMACIST, PATIENT (own only).
+- `routes/test-orders.js`:
+  - `POST /api/test-orders` — order a test. Accessible by: ADMIN, DOCTOR.
+  - `GET /api/test-orders` — list test orders (filterable by status, patient). Accessible by:
+    ADMIN, DOCTOR, LAB_TECH, PATIENT (own only).
+- `routes/admissions.js`:
+  - `POST /api/admissions` — **implement the admission logic from Section 10.1.5 C** (find
+    first free isolation bed → insert). Accessible by: ADMIN, DOCTOR.
+  - `PUT /api/admissions/:id/discharge` — set discharge_datetime + status=DISCHARGED.
+    Accessible by: ADMIN, DOCTOR.
+- `routes/roster.js`:
+  - `GET /api/roster?date=` — get duty roster for a date. Accessible by: ADMIN, RECEPTIONIST,
+    DOCTOR.
+
+**Frontend — build these pages:**
+- `/doctor` → DoctorDashboard (stat cards: waiting count, seen today, prescriptions today +
+  token queue for own unit with "Start visit" buttons).
+- `/doctor/queue` → TokenQueue (own unit, today, with "Start visit" buttons).
+- `/doctor/visits/new/:tokenId` → CreateVisitForm (all vitals fields from 10.1.6). On save,
+  option to continue to prescription form.
+- `/doctor/visits/emergency` → same form but no token, visit_type auto-set to EMERGENCY,
+  patient selected from dropdown.
+- `/doctor/visits/:id` → VisitDetail (read-only view with edit button for diagnosis/follow-up).
+- `/doctor/prescriptions/new/:visitId` → WritePrescriptionForm (advice, next visit date,
+  repeatable item rows with add/remove — all fields from 10.1.6).
+- `/doctor/test-orders` → TestOrderList (table with status badges) + OrderTestForm (select
+  patient + test from catalogue dropdown).
+- `/doctor/admissions/new` → AdmitPatientForm (patient dropdown, disease text field).
+  Show bed assignment in the success response.
+- `/doctor/admissions` → current admissions table with "Discharge" buttons on occupied beds.
+
+**Test:** log in as receptionist → issue a token → log in as doctor → see the token in queue →
+start visit → fill vitals → save and write prescription → add 2 medicine items → save → go to
+test orders → order a CBC → go to admissions → admit a patient → see the bed assigned → discharge.
+
+---
+
+### Phase 4 — Pharmacist (dispense + stock management)
+
+**Why third:** depends on prescriptions from Phase 3.
+
+**Backend — add these route files:**
+- `routes/dispense.js`:
+  - `POST /api/dispense` — **implement the dispense transaction from Section 10.1.5 B exactly**
+    (resolve patient via join chain → determine billing category with guardian lookup → check
+    stock → BEGIN → insert dispenses + decrement stock → COMMIT). This is the hardest endpoint.
+    Accessible by: ADMIN, PHARMACIST.
+- `routes/medicines.js`:
+  - `GET /api/medicines` — list all medicines. Accessible by: ADMIN, PHARMACIST.
+  - `POST /api/medicines` — add new medicine. Accessible by: ADMIN, PHARMACIST.
+  - `PUT /api/medicines/:id` — update stock/price/reorder. Accessible by: ADMIN, PHARMACIST.
+  - `DELETE /api/medicines/:id` — delete only if never prescribed (check prescription_item FK).
+    Accessible by: ADMIN, PHARMACIST.
+  - `GET /api/medicines/low-stock` — medicines where stock < reorder_level. Accessible by:
+    ADMIN, PHARMACIST.
+
+**Frontend — build these pages:**
+- `/pharmacy` → PharmacyDashboard (stat cards: total medicines, low-stock count, today's
+  revenue).
+- `/pharmacy/dispense` → DispenseQueue (list of undispensed prescriptions — prescriptions where
+  not all items have been dispensed). Each shows patient, doctor, items. Click "Dispense" →
+  DispenseForm showing each item with editable dispensed_quantity, computed charge shown.
+- `/pharmacy/medicines` → MedicineList (full inventory table with stock/reorder/status) +
+  AddMedicineForm + inline edit for stock/price.
+- `/pharmacy/low-stock` → LowStockReport (filtered red-alert list) + DispenseLog (read-only
+  history of past dispenses).
+
+**Test:** log in as doctor → write a prescription with 2 items → log in as pharmacist → see
+the prescription in the dispense queue → dispense it → verify stock decremented → verify
+student was charged 0 → log in as doctor → write a prescription for a teacher → dispense →
+verify teacher was charged cost price. Try dispensing when stock is insufficient → see error.
+
+---
+
+### Phase 5 — Lab Technician (test results)
+
+**Why fourth:** depends on test orders from Phase 3.
+
+**Backend — add to `routes/test-orders.js` (already created in Phase 3):**
+- `PUT /api/test-orders/:id/result` — update sample_collected_at, status, result_value,
+  result_date, remarks. Accessible by: ADMIN, LAB_TECH.
+- `GET /api/diagnostic-tests` — list test catalogue. Accessible by: ADMIN, LAB_TECH, DOCTOR.
+
+**Frontend — build these pages:**
+- `/lab` → LabDashboard (stat cards: pending count, completed count, catalogue size).
+- `/lab/pending` → PendingTestOrders (list of orders with status ORDERED or SAMPLE_COLLECTED,
+  each with "Enter result" button).
+- `/lab/test-orders/:id` → EnterResultsForm (all fields from 10.1.6: sample collected datetime,
+  status dropdown, result value, result date, remarks).
+- `/lab/catalogue` → TestCatalogue (read-only table of diagnostic tests with categories, sample
+  types, normal ranges, available days).
+
+**Test:** log in as doctor → order a CBC for a patient → log in as lab tech → see it in pending
+→ mark sample collected → enter result → status changes to COMPLETED → log in as doctor →
+see the result in test orders.
+
+---
+
+### Phase 6 — Patient (read-only self-service)
+
+**Why fifth:** pure read-only views of data created by all previous phases. Simplest role.
+
+**Backend — no new routes needed.** The endpoints from Phases 2–5 already support patient
+access. Just ensure the PATIENT role guard and own-data filtering work:
+- `GET /api/patients/:id` — server checks `req.user.patient_id === req.params.id`.
+- `GET /api/visits?patient=me` — server adds `WHERE patient_id = $jwt_patient_id`.
+- `GET /api/prescriptions?patient=me` — same filter.
+- `GET /api/test-orders?patient=me` — same filter.
+- `GET /api/health-cards/me` — returns the card for `req.user.patient_id`.
+
+**Frontend — build these pages:**
+- `/patient` → PatientDashboard (profile card with name/category/department/ID, health card
+  status badge with expiry, stat cards: visits, prescriptions, tests).
+- `/patient/visits` → OwnVisitHistory (list of own visits with vitals, diagnosis, follow-up
+  dates). Read-only, no edit/delete buttons.
+- `/patient/prescriptions` → OwnPrescriptions (own prescriptions with medicine items).
+  Read-only.
+- `/patient/test-results` → OwnTestResults (own test orders with status and results).
+  Read-only.
+- `/patient/health-card` → OwnCardStatus (visual card display with number, expiry, status).
+  Read-only.
+
+**Test:** log in as patient (patient.rakib) → see own profile → see own visit history (should
+show visits for Rakibul Hasan only, not other patients) → see own prescriptions → see own
+test results → see own card status. Try accessing another patient's data via URL manipulation
+→ should get 403.
+
+---
+
+### Phase 7 — Admin (management + reports + ambulance)
+
+**Why last:** admin is the management/reporting layer that sits on top of all the data the
+other roles created. It also manages entities (doctors, units, roster, ambulances, users) that
+are reference data — less critical to the patient journey.
+
+**Backend — add these route files:**
+- `routes/doctors.js`:
+  - `GET/POST/PUT/DELETE /api/doctors` — CRUD. Only ADMIN.
+- `routes/units.js`:
+  - `GET/POST/PUT/DELETE /api/units` — CRUD. Only ADMIN.
+- `routes/roster.js` (extend from Phase 3):
+  - `POST /api/roster` — create roster assignment. Only ADMIN.
+  - `PUT /api/roster/:id` — edit assignment. Only ADMIN.
+  - `DELETE /api/roster/:id` — delete assignment. Only ADMIN.
+- `routes/ambulance.js`:
+  - `GET /api/ambulances` — list with live status (use v_ambulance_status view). Accessible
+    by: ADMIN, RECEPTIONIST, DOCTOR.
+  - `PUT /api/ambulances/:id` — update vehicle status/driver. Only ADMIN.
+  - `POST /api/ambulance-dispatch` — create dispatch. Accessible by: ADMIN, DOCTOR,
+    RECEPTIONIST.
+  - `PUT /api/ambulance-dispatch/:id/return` — mark returned. Accessible by: ADMIN.
+- `routes/reports.js`:
+  - `GET /api/reports/dispensary` — read v_daily_dispensary view. Only ADMIN.
+  - `GET /api/reports/workload` — read v_doctor_workload view. Only ADMIN.
+  - `GET /api/reports/occupancy` — read v_bed_occupancy view. Only ADMIN.
+  - `GET /api/reports/ambulance` — read v_ambulance_status view. Only ADMIN.
+- `routes/users.js`:
+  - `GET/POST/PUT /api/users` — manage app_user accounts. Only ADMIN.
+
+**Frontend — build these pages:**
+- `/admin` → AdminDashboard (summary stat cards: total patients, visits today, revenue today,
+  bed occupancy, ambulance status widget, doctor workload chart).
+- `/admin/doctors` → DoctorList (full table with type/unit/phone/part-time) + DoctorForm
+  (add/edit). Edit and Delete buttons per row.
+- `/admin/units` → UnitList + UnitForm.
+- `/admin/roster` → RosterTable (date/doctor/shift/unit/on-call) + AddAssignmentForm. Edit
+  and Delete buttons per row.
+- `/admin/ambulances` → AmbulanceStatus (fleet cards with live derived status: in-service /
+  on-trip / maintenance) + DispatchLog (full table with "Mark returned" button on dispatched
+  trips) + NewDispatchForm.
+- `/admin/reports` → ReportsDashboard (dispensary revenue chart/table, doctor workload
+  ranking, bed occupancy bar, ambulance utilisation stats). All read from the database views.
+- `/admin/users` → UserList (table with username/role/linked/active) + CreateUserForm +
+  activate/deactivate toggle.
+
+**Test:** log in as admin → see dashboard with real stats → add a doctor → add a roster
+assignment → view reports → create a user → dispatch an ambulance → mark it returned. Verify
+all data created by previous phases shows up correctly in reports.
+
+---
+
+### Phase 8 — Polish and demo prep
+
+- Add loading spinners on API calls.
+- Add toast notifications on success/error (e.g. "Patient registered", "Insufficient stock").
+- Add confirmation dialogs on delete actions ("Are you sure?").
+- Responsive sidebar (collapse on mobile).
+- Run through the full patient journey end-to-end: register → card → token → visit →
+  prescription → dispense → test order → result → admission → discharge.
+- Prepare the 5-minute presentation (Part III).
+- Take screenshots of the SQL DDL, populated tables, and query outputs for the report (Part I,
+  requirements 8.e, 8.f, 8.g).
+
+---
+
+### Rules for every phase
+
+- **Parameterized queries only** (`$1, $2, ...`) — never concatenate user input into SQL.
+- **Transactions** for any multi-step write (dispense is the main one, but also prescription
+  creation with items).
+- **Role guard on every route** — use `verifyToken` + `authorize(...)` from Phase 1.
+- **Standard response format** from Section 10.1.4 — `{ success, data }` or `{ success, error }`.
+- **No business logic in the frontend** — the frontend sends data, the server validates and
+  enforces rules (card validity, stock check, charge computation). The frontend only displays
+  what the server returns.
+- **Keep the database the centre of gravity** — constraints, CHECK values, and FK restrictions
+  are the last line of defense. The app layer adds convenience (error messages, computed fields)
+  but the database catches anything the app misses.
