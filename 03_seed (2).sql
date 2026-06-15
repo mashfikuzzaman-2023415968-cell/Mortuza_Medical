@@ -316,7 +316,7 @@ INSERT INTO ambulance_dispatch (dispatch_id, ambulance_id, patient_id, authorize
 -- email_verified = TRUE for seed users so login works immediately.
 -- In production, new users start with email_verified = FALSE until they click the verification link.
 INSERT INTO app_user (user_id, username, password_hash, role, doctor_id, patient_id, email, verification_token, email_verified, is_active) VALUES
- (1,'admin',       '$2b$10$placeholderhashadminxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx','ADMIN',NULL,NULL,'admin@mmcms.du.ac.bd',NULL,TRUE,TRUE),
+ (1,'mashfikuzzaman','$2b$10$placeholderhashadminxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx','ADMIN',NULL,NULL,'mashfikuzzaman-2023415968@cs.du.ac.bd',NULL,TRUE,TRUE),
  (2,'dr.tanvir',   '$2b$10$placeholderhashdoc1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx','DOCTOR',1,NULL,'cmo.dumc@gmail.com',NULL,TRUE,TRUE),
  (3,'dr.razia',    '$2b$10$placeholderhashdoc2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx','DOCTOR',2,NULL,'raziarahman1973@gmail.com',NULL,TRUE,TRUE),
  (4,'reception1',  '$2b$10$placeholderhashrecpxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx','RECEPTIONIST',NULL,NULL,'reception@mmcms.du.ac.bd',NULL,TRUE,TRUE),
