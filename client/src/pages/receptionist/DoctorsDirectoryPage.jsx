@@ -1,0 +1,25 @@
+import { useEffect, useState } from 'react';
+import api from '../../api/axios';
+import DoctorsReadOnly from '../../components/DoctorsReadOnly';
+
+export default function ReceptionDoctorsPage() {
+  const [doctors, setDoctors] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get('/doctors')
+      .then((r) => setDoctors(r.data.data || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  return (
+    <DoctorsReadOnly
+      doctors={doctors}
+      loading={loading}
+      showPhone={true}
+      title="Doctor Directory"
+      subtitle="Search by name or specialization to find the right doctor for a patient's query."
+    />
+  );
+}

@@ -8,7 +8,7 @@ const DOCTOR_TYPES = ['GENERAL', 'SPECIALIST', 'EYE', 'DENTAL', 'HOMEO', 'PHYSIO
 const GENDERS = ['M', 'F'];
 
 // GET /api/doctors - list all doctors with unit info
-router.get('/', verifyToken, authorize('RECEPTIONIST', 'DOCTOR'), async (req, res) => {
+router.get('/', verifyToken, authorize('RECEPTIONIST', 'DOCTOR', 'PATIENT'), async (req, res) => {
   try {
     const { search, unit_id, doctor_type } = req.query;
     const conditions = [];
@@ -16,7 +16,7 @@ router.get('/', verifyToken, authorize('RECEPTIONIST', 'DOCTOR'), async (req, re
 
     if (search) {
       params.push(`%${search}%`);
-      conditions.push(`(d.full_name ILIKE $${params.length} OR d.bmdc_reg_no ILIKE $${params.length})`);
+      conditions.push(`(d.full_name ILIKE $${params.length} OR d.specialization ILIKE $${params.length})`);
     }
     if (unit_id) {
       params.push(unit_id);
@@ -28,12 +28,17 @@ router.get('/', verifyToken, authorize('RECEPTIONIST', 'DOCTOR'), async (req, re
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const isAdmin = req.user.role === 'ADMIN';
+    const selectFields = isAdmin
+      ? 'd.*'
+      : 'd.doctor_id, d.full_name, d.designation, d.specialization, d.doctor_type, d.is_parttime, d.phone';
+
     const result = await pool.query(
-      `SELECT d.*, u.unit_name
+      `SELECT ${selectFields}, u.unit_name, u.floor_location
        FROM doctor d
        LEFT JOIN unit u ON u.unit_id = d.unit_id
        ${where}
-       ORDER BY d.full_name`,
+       ORDER BY d.doctor_type, d.full_name`,
       params
     );
     return res.json({ success: true, data: result.rows, count: result.rows.length });

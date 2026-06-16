@@ -9,7 +9,7 @@ const UNIT_TYPES = ['OUTPATIENT', 'DENTAL', 'EYE', 'HOMEO', 'PHYSIO', 'PATHOLOGY
 // GET /api/units - list units (all authenticated users need this for form dropdowns)
 router.get('/', verifyToken, async (req, res) => {
   try {
-    const showAll = req.query.all === 'true';
+    const showAll = req.user.role === 'ADMIN' && req.query.all === 'true';
     const where = showAll ? '' : 'WHERE is_active = TRUE';
     const result = await pool.query(
       `SELECT unit_id, unit_name, unit_type, floor_location, contact_ext, is_active

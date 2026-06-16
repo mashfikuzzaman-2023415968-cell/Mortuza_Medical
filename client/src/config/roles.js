@@ -29,6 +29,8 @@ export const NAV = {
     { k: 'patients', l: 'Patients', i: Users },
     { k: 'cards', l: 'Health cards', i: CreditCard },
     { k: 'tokens', l: 'Token queue', i: Hash },
+    { k: 'units', l: 'Units', i: Building2 },
+    { k: 'doctors', l: 'Doctors', i: Stethoscope },
     { k: 'ambulance', l: 'Ambulance', i: Ambulance },
   ],
   DOCTOR: [
@@ -56,6 +58,8 @@ export const NAV = {
     { k: 'rx', l: 'Prescriptions', i: ClipboardList },
     { k: 'tests', l: 'Test results', i: FlaskConical },
     { k: 'card', l: 'Health card', i: CreditCard },
+    { k: 'units', l: 'Units', i: Building2 },
+    { k: 'doctors', l: 'Doctors', i: Stethoscope },
   ],
 };
 

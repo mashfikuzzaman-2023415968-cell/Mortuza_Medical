@@ -10,6 +10,8 @@ import PatientsPage from './receptionist/PatientsPage';
 import HealthCardsPage from './receptionist/HealthCardsPage';
 import TokensPage from './receptionist/TokensPage';
 import ReceptionAmbulancePage from './receptionist/AmbulancePage';
+import ReceptionUnitsPage from './receptionist/UnitsPage';
+import ReceptionDoctorsPage from './receptionist/DoctorsDirectoryPage';
 import DoctorDashboard from './doctor/DoctorDashboard';
 import QueuePage from './doctor/QueuePage';
 import VisitsPage from './doctor/VisitsPage';
@@ -28,6 +30,8 @@ import PatientVisitsPage from './patient/PatientVisitsPage';
 import PatientPrescriptionsPage from './patient/PatientPrescriptionsPage';
 import PatientTestResultsPage from './patient/PatientTestResultsPage';
 import PatientHealthCardPage from './patient/PatientHealthCardPage';
+import PatientUnitsPage from './patient/PatientUnitsPage';
+import PatientDoctorsPage from './patient/PatientDoctorsPage';
 import AdminDashboard from './admin/AdminDashboard';
 import DoctorsPage from './admin/DoctorsPage';
 import UnitsPage from './admin/UnitsPage';
@@ -264,6 +268,10 @@ export default function DashboardHome() {
         <TokensPage />
       ) : nav === 'ambulance' && user.role === 'RECEPTIONIST' ? (
         <ReceptionAmbulancePage />
+      ) : nav === 'units' && user.role === 'RECEPTIONIST' ? (
+        <ReceptionUnitsPage />
+      ) : nav === 'doctors' && user.role === 'RECEPTIONIST' ? (
+        <ReceptionDoctorsPage />
       ) : nav === 'queue' && user.role === 'DOCTOR' ? (
         <QueuePage />
       ) : nav === 'visits' && user.role === 'DOCTOR' ? (
@@ -292,6 +300,10 @@ export default function DashboardHome() {
         <PatientTestResultsPage />
       ) : nav === 'card' && user.role === 'PATIENT' ? (
         <PatientHealthCardPage />
+      ) : nav === 'units' && user.role === 'PATIENT' ? (
+        <PatientUnitsPage />
+      ) : nav === 'doctors' && user.role === 'PATIENT' ? (
+        <PatientDoctorsPage />
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <h3 className="text-lg font-semibold text-gray-800">{current?.l}</h3>
