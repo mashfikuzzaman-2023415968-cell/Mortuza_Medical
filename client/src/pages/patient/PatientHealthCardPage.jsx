@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
-import { Loader2, CreditCard, CheckCircle2, AlertCircle, XCircle, User } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Loader2, CreditCard, CheckCircle2, AlertCircle, XCircle, User, X, ZoomIn } from 'lucide-react';
 import api from '../../api/axios';
+import { useAuth } from '../../context/AuthContext';
+import { usePatientPhoto } from '../../hooks/usePatientPhoto';
 
 const STATUS_CONFIG = {
   ACTIVE: { icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', label: 'Active', desc: 'Your health card is valid and active.' },
@@ -25,10 +27,51 @@ function InfoRow({ label, value }) {
   );
 }
 
+function PhotoZoomOverlay({ photoUrl, onClose }) {
+  const overlayRef = useRef(null);
+
+  useEffect(() => {
+    const handleKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={overlayRef}
+      onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      style={{ animation: 'fadeIn 0.15s ease-out' }}
+    >
+      <div
+        className="relative max-w-sm w-full mx-4"
+        style={{ animation: 'cardPop 0.2s cubic-bezier(0.34,1.56,0.64,1)' }}
+      >
+        <img
+          src={photoUrl}
+          alt="Patient photo"
+          className="w-full rounded-2xl shadow-2xl object-cover"
+          style={{ maxHeight: '80vh', objectFit: 'contain' }}
+        />
+        <button
+          onClick={onClose}
+          className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-white shadow-lg flex items-center justify-center text-gray-600 hover:text-gray-900 hover:shadow-xl transition-all"
+        >
+          <X size={16} />
+        </button>
+        <p className="text-center text-xs text-white/60 mt-3">Press Esc or click outside to close</p>
+      </div>
+    </div>
+  );
+}
+
 export default function PatientHealthCardPage() {
+  const { user } = useAuth();
+  const { photoUrl } = usePatientPhoto(user?.patient_id);
   const [card, setCard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [zoomed, setZoomed] = useState(false);
 
   useEffect(() => {
     api
@@ -61,7 +104,6 @@ export default function PatientHealthCardPage() {
 
   const cfg = STATUS_CONFIG[card.status] || STATUS_CONFIG.ACTIVE;
   const StatusIcon = cfg.icon;
-
   const isExpiredByDate = card.expiry_date && card.expiry_date < new Date().toISOString().slice(0, 10);
 
   return (
@@ -79,24 +121,51 @@ export default function PatientHealthCardPage() {
 
       {/* Card visual */}
       <div className="bg-gradient-to-br from-slate-600 to-gray-800 rounded-2xl p-6 text-white shadow-lg">
-        <div className="flex items-start justify-between mb-6">
+        <div className="flex items-start justify-between mb-5">
           <div>
             <p className="text-xs text-gray-300 mb-1">University Medical Centre</p>
             <p className="text-lg font-bold tracking-wide">{card.card_number}</p>
           </div>
           <CreditCard size={28} className="text-gray-300 opacity-70" />
         </div>
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="text-xs text-gray-400 mb-0.5">Card holder</p>
-            <p className="font-semibold">{card.full_name}</p>
-            <div className="flex items-center gap-2 mt-1">
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_COLORS[card.patient_category] || 'bg-gray-600 text-white'}`}>
-                {card.patient_category}
-              </span>
-              {card.university_id && <span className="text-xs text-gray-300">{card.university_id}</span>}
+
+        <div className="flex items-end justify-between gap-4">
+          <div className="flex items-end gap-4">
+            {/* Photo area — clickable if photo exists */}
+            <div className="flex-shrink-0">
+              {photoUrl ? (
+                <button
+                  type="button"
+                  onClick={() => setZoomed(true)}
+                  className="relative w-16 h-20 rounded-xl overflow-hidden border-2 border-white/30 shadow-lg group focus:outline-none focus:ring-2 focus:ring-white/50"
+                  title="Click to zoom"
+                >
+                  <img src={photoUrl} alt="Your photo" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                    <ZoomIn size={18} className="text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+                  </div>
+                </button>
+              ) : (
+                <div className="w-16 h-20 rounded-xl border-2 border-white/20 bg-white/10 flex items-center justify-center">
+                  <User size={24} className="text-white/40" />
+                </div>
+              )}
+            </div>
+
+            {/* Cardholder info */}
+            <div>
+              <p className="text-xs text-gray-400 mb-0.5">Card holder</p>
+              <p className="font-semibold">{card.full_name}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_COLORS[card.patient_category] || 'bg-gray-600 text-white'}`}>
+                  {card.patient_category}
+                </span>
+                {card.university_id && <span className="text-xs text-gray-300">{card.university_id}</span>}
+              </div>
             </div>
           </div>
+
+          {/* Expiry */}
           <div className="text-right">
             <p className="text-xs text-gray-400 mb-0.5">Expires</p>
             <p className={`text-sm font-medium ${isExpiredByDate ? 'text-red-300' : 'text-white'}`}>
@@ -104,6 +173,10 @@ export default function PatientHealthCardPage() {
             </p>
           </div>
         </div>
+
+        {photoUrl && (
+          <p className="text-[10px] text-white/30 mt-3 text-center">Tap photo to zoom</p>
+        )}
       </div>
 
       {/* Details */}
@@ -121,6 +194,11 @@ export default function PatientHealthCardPage() {
         <InfoRow label="Date of birth" value={card.date_of_birth} />
         <InfoRow label="Phone" value={card.phone} />
       </div>
+
+      {/* Zoom overlay */}
+      {zoomed && photoUrl && (
+        <PhotoZoomOverlay photoUrl={photoUrl} onClose={() => setZoomed(false)} />
+      )}
     </div>
   );
 }

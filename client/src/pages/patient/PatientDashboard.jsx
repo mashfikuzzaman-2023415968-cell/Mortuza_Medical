@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Stethoscope, ClipboardList, FlaskConical, CreditCard, User, CheckCircle2, AlertCircle, XCircle } from 'lucide-react';
 import api from '../../api/axios';
+import { useAuth } from '../../context/AuthContext';
+import { usePatientPhoto } from '../../hooks/usePatientPhoto';
 
 const CARD_STATUS_STYLES = {
   ACTIVE: { icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50', label: 'Active' },
@@ -33,6 +35,8 @@ function StatCard({ icon: Icon, color, label, value, onClick }) {
 }
 
 export default function PatientDashboard({ onNavChange }) {
+  const { user } = useAuth();
+  const { photoUrl } = usePatientPhoto(user?.patient_id);
   const [profile, setProfile] = useState(null);
   const [card, setCard] = useState(null);
   const [counts, setCounts] = useState({ visits: null, prescriptions: null, tests: null });
@@ -62,8 +66,12 @@ export default function PatientDashboard({ onNavChange }) {
     <div className="space-y-6">
       {/* Profile banner */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex items-center gap-4">
-        <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center">
-          <User size={22} className="text-slate-500" />
+        <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+          {photoUrl ? (
+            <img src={photoUrl} alt="Profile" className="w-full h-full object-cover" />
+          ) : (
+            <User size={22} className="text-slate-500" />
+          )}
         </div>
         <div className="flex-1 min-w-0">
           {loading ? (

@@ -1,4 +1,8 @@
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
+const multer = require('multer');
 const pool = require('../config/db');
 const { verifyToken, authorize } = require('../middleware/auth');
 
@@ -6,6 +10,42 @@ const router = express.Router();
 
 const CATEGORIES = ['STUDENT', 'TEACHER', 'STAFF', 'FAMILY'];
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
+// ── Photo upload setup ──────────────────────────────────────────────────────
+const UPLOAD_DIR = path.join(__dirname, '../../uploads/patients');
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+  filename: (req, file, cb) => {
+    const ext = file.mimetype === 'image/png' ? '.png' : '.jpg';
+    cb(null, `${crypto.randomUUID()}${ext}`);
+  },
+});
+
+const fileFilter = (req, file, cb) => {
+  if (['image/jpeg', 'image/jpg', 'image/png'].includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only JPEG and PNG images are accepted'), false);
+  }
+};
+
+const upload = multer({ storage, limits: { fileSize: 2 * 1024 * 1024 }, fileFilter });
+
+function handleUpload(req, res, next) {
+  upload.single('photo')(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ success: false, error: 'Photo must be under 2 MB' });
+      }
+      return res.status(400).json({ success: false, error: err.message });
+    }
+    if (err) return res.status(400).json({ success: false, error: err.message });
+    next();
+  });
+}
+// ───────────────────────────────────────────────────────────────────────────
 
 // GET /api/patients/me - patient views their own profile
 router.get('/me', verifyToken, authorize('PATIENT'), async (req, res) => {
@@ -45,7 +85,7 @@ router.get('/', verifyToken, authorize('RECEPTIONIST', 'DOCTOR'), async (req, re
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const result = await pool.query(
       `SELECT patient_id, full_name, date_of_birth, gender, blood_group, phone, email, address,
-              patient_category, university_id, academic_dept, guardian_id, registration_date
+              patient_category, university_id, academic_dept, guardian_id, registration_date, photo_url
        FROM patient
        ${where}
        ORDER BY patient_id DESC`,
@@ -58,12 +98,38 @@ router.get('/', verifyToken, authorize('RECEPTIONIST', 'DOCTOR'), async (req, re
   }
 });
 
+// GET /api/patients/:id/photo - serve patient photo securely (JWT required)
+router.get('/:id/photo', verifyToken, authorize('RECEPTIONIST', 'DOCTOR', 'PATIENT'), async (req, res) => {
+  try {
+    // Patients may only view their own photo
+    if (req.user.role === 'PATIENT' && Number(req.user.patient_id) !== Number(req.params.id)) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+
+    const result = await pool.query('SELECT photo_url FROM patient WHERE patient_id = $1', [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Patient not found' });
+
+    const filename = result.rows[0].photo_url;
+    if (!filename) return res.status(404).json({ success: false, error: 'No photo on file' });
+
+    // path.basename prevents any path traversal even if a bad value somehow got into the DB
+    const filePath = path.join(UPLOAD_DIR, path.basename(filename));
+    if (!fs.existsSync(filePath)) return res.status(404).json({ success: false, error: 'Photo file not found' });
+
+    res.setHeader('Cache-Control', 'private, max-age=86400');
+    return res.sendFile(filePath);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
 // GET /api/patients/:id - profile + health card status
 router.get('/:id', verifyToken, authorize('RECEPTIONIST', 'DOCTOR'), async (req, res) => {
   try {
     const patientResult = await pool.query(
       `SELECT patient_id, full_name, date_of_birth, gender, blood_group, phone, email, address,
-              patient_category, university_id, academic_dept, guardian_id, registration_date
+              patient_category, university_id, academic_dept, guardian_id, registration_date, photo_url
        FROM patient WHERE patient_id = $1`,
       [req.params.id]
     );
@@ -119,9 +185,7 @@ router.post('/', verifyToken, authorize('RECEPTIONIST'), async (req, res) => {
         `SELECT patient_id, patient_category FROM patient WHERE patient_id = $1`,
         [guardian_id]
       );
-      if (guardian.rows.length === 0) {
-        return res.status(400).json({ success: false, error: 'Guardian not found' });
-      }
+      if (guardian.rows.length === 0) return res.status(400).json({ success: false, error: 'Guardian not found' });
       if (!['TEACHER', 'STAFF'].includes(guardian.rows[0].patient_category)) {
         return res.status(400).json({ success: false, error: 'Guardian must be a TEACHER or STAFF patient' });
       }
@@ -149,9 +213,34 @@ router.post('/', verifyToken, authorize('RECEPTIONIST'), async (req, res) => {
 
     return res.status(201).json({ success: true, data: result.rows[0] });
   } catch (err) {
-    if (err.code === '23505') {
-      return res.status(409).json({ success: false, error: 'University ID is already registered' });
+    if (err.code === '23505') return res.status(409).json({ success: false, error: 'University ID is already registered' });
+    console.error(err);
+    return res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
+// POST /api/patients/:id/photo - upload patient photo (RECEPTIONIST + ADMIN)
+router.post('/:id/photo', verifyToken, authorize('RECEPTIONIST'), handleUpload, async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, error: 'No photo file provided' });
+
+    const existing = await pool.query('SELECT photo_url FROM patient WHERE patient_id = $1', [req.params.id]);
+    if (existing.rows.length === 0) {
+      fs.unlink(req.file.path, () => {});
+      return res.status(404).json({ success: false, error: 'Patient not found' });
     }
+
+    // Delete the old photo file to avoid orphaned files on disk
+    const oldFilename = existing.rows[0].photo_url;
+    if (oldFilename) {
+      const oldPath = path.join(UPLOAD_DIR, path.basename(oldFilename));
+      fs.unlink(oldPath, () => {});
+    }
+
+    await pool.query('UPDATE patient SET photo_url = $1 WHERE patient_id = $2', [req.file.filename, req.params.id]);
+    return res.json({ success: true, message: 'Photo uploaded successfully' });
+  } catch (err) {
+    if (req.file) fs.unlink(req.file.path, () => {});
     console.error(err);
     return res.status(500).json({ success: false, error: 'Server error' });
   }
@@ -189,9 +278,7 @@ router.put('/:id', verifyToken, authorize('RECEPTIONIST'), async (req, res) => {
         `SELECT patient_id, patient_category FROM patient WHERE patient_id = $1`,
         [guardian_id]
       );
-      if (guardian.rows.length === 0) {
-        return res.status(400).json({ success: false, error: 'Guardian not found' });
-      }
+      if (guardian.rows.length === 0) return res.status(400).json({ success: false, error: 'Guardian not found' });
       if (!['TEACHER', 'STAFF'].includes(guardian.rows[0].patient_category)) {
         return res.status(400).json({ success: false, error: 'Guardian must be a TEACHER or STAFF patient' });
       }
@@ -220,15 +307,10 @@ router.put('/:id', verifyToken, authorize('RECEPTIONIST'), async (req, res) => {
       ]
     );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Patient not found' });
-    }
-
+    if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Patient not found' });
     return res.json({ success: true, data: result.rows[0] });
   } catch (err) {
-    if (err.code === '23505') {
-      return res.status(409).json({ success: false, error: 'University ID is already registered' });
-    }
+    if (err.code === '23505') return res.status(409).json({ success: false, error: 'University ID is already registered' });
     console.error(err);
     return res.status(500).json({ success: false, error: 'Server error' });
   }

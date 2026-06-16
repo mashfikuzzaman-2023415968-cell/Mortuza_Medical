@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Search, UserPlus, Pencil, X, Loader2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Search, UserPlus, Pencil, X, Loader2, Camera, ImageOff } from 'lucide-react';
 import api from '../../api/axios';
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
@@ -19,14 +19,95 @@ const EMPTY_FORM = {
   guardian_id: '',
 };
 
-function PatientForm({ initial, guardians, onSubmit, onCancel, submitting, error }) {
+function PhotoPicker({ hasExisting, onChange }) {
+  const inputRef = useRef(null);
+  const [preview, setPreview] = useState(null);
+  const [sizeError, setSizeError] = useState('');
+
+  const handleFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setSizeError('Photo must be under 2 MB.');
+      e.target.value = '';
+      return;
+    }
+    setSizeError('');
+    setPreview(URL.createObjectURL(file));
+    onChange(file);
+  };
+
+  const clear = () => {
+    setPreview(null);
+    setSizeError('');
+    if (inputRef.current) inputRef.current.value = '';
+    onChange(null);
+  };
+
+  return (
+    <div className="md:col-span-2">
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        Passport photo
+        <span className="ml-1 text-xs text-gray-400 font-normal">(JPEG / PNG, max 2 MB)</span>
+      </label>
+      <div className="flex items-center gap-3">
+        {preview ? (
+          <div className="relative w-16 h-20 rounded-lg overflow-hidden border border-gray-200 flex-shrink-0">
+            <img src={preview} alt="preview" className="w-full h-full object-cover" />
+            <button
+              type="button"
+              onClick={clear}
+              className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center"
+            >
+              <X size={10} />
+            </button>
+          </div>
+        ) : (
+          <div className="w-16 h-20 rounded-lg border border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center gap-1 flex-shrink-0">
+            {hasExisting ? (
+              <>
+                <Camera size={16} className="text-gray-400" />
+                <span className="text-[10px] text-gray-400 text-center leading-tight">On file</span>
+              </>
+            ) : (
+              <ImageOff size={16} className="text-gray-300" />
+            )}
+          </div>
+        )}
+        <div>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+          >
+            <Camera size={13} /> {hasExisting && !preview ? 'Replace photo' : 'Choose photo'}
+          </button>
+          {sizeError && <p className="text-xs text-red-600 mt-1">{sizeError}</p>}
+          {hasExisting && !preview && (
+            <p className="text-xs text-gray-400 mt-1">A photo is already on file. Choose one to replace it.</p>
+          )}
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/jpeg,image/jpg,image/png"
+            className="hidden"
+            onChange={handleFile}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PatientForm({ initial, guardians, hasExistingPhoto, onSubmit, onCancel, submitting, error }) {
   const [form, setForm] = useState(initial);
+  const [photoFile, setPhotoFile] = useState(null);
 
   const handleChange = (field, value) => setForm((f) => ({ ...f, [field]: value }));
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit(form);
+    onSubmit(form, photoFile);
   };
 
   return (
@@ -137,6 +218,7 @@ function PatientForm({ initial, guardians, onSubmit, onCancel, submitting, error
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
           />
         </div>
+        <PhotoPicker hasExisting={hasExistingPhoto} onChange={setPhotoFile} />
       </div>
       <div className="flex justify-end gap-2 pt-2">
         <button type="button" onClick={onCancel} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100">
@@ -150,6 +232,15 @@ function PatientForm({ initial, guardians, onSubmit, onCancel, submitting, error
   );
 }
 
+function InitialsAvatar({ name }) {
+  const initials = (name || '?').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+  return (
+    <div className="w-8 h-8 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center text-xs font-semibold flex-shrink-0">
+      {initials}
+    </div>
+  );
+}
+
 export default function PatientsPage() {
   const [patients, setPatients] = useState([]);
   const [allPatients, setAllPatients] = useState([]);
@@ -157,7 +248,7 @@ export default function PatientsPage() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState(null); // patient being edited, or null for new
+  const [editing, setEditing] = useState(null);
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -199,7 +290,7 @@ export default function PatientsPage() {
     setShowForm(true);
   };
 
-  const handleSubmit = async (form) => {
+  const handleSubmit = async (form, photoFile) => {
     setSubmitting(true);
     setFormError('');
     const payload = {
@@ -209,10 +300,18 @@ export default function PatientsPage() {
       university_id: form.patient_category === 'FAMILY' ? null : form.university_id,
     };
     try {
+      let patientId;
       if (editing) {
         await api.put(`/patients/${editing.patient_id}`, payload);
+        patientId = editing.patient_id;
       } else {
-        await api.post('/patients', payload);
+        const res = await api.post('/patients', payload);
+        patientId = res.data.data.patient_id;
+      }
+      if (photoFile) {
+        const fd = new FormData();
+        fd.append('photo', photoFile);
+        await api.post(`/patients/${patientId}/photo`, fd);
       }
       setShowForm(false);
       setEditing(null);
@@ -286,6 +385,7 @@ export default function PatientsPage() {
             <PatientForm
               initial={formInitial}
               guardians={guardians}
+              hasExistingPhoto={!!editing?.photo_url}
               onSubmit={handleSubmit}
               onCancel={() => { setShowForm(false); setEditing(null); }}
               submitting={submitting}
@@ -319,7 +419,15 @@ export default function PatientsPage() {
               <tbody>
                 {patients.map((p) => (
                   <tr key={p.patient_id} className="border-b border-gray-50 last:border-0">
-                    <td className="py-2.5 pr-4 font-medium text-gray-700">{p.full_name}</td>
+                    <td className="py-2.5 pr-4">
+                      <div className="flex items-center gap-2">
+                        <InitialsAvatar name={p.full_name} />
+                        <span className="font-medium text-gray-700">{p.full_name}</span>
+                        {p.photo_url && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-sky-400 flex-shrink-0" title="Photo on file" />
+                        )}
+                      </div>
+                    </td>
                     <td className="py-2.5 pr-4 text-gray-500">{p.patient_category}</td>
                     <td className="py-2.5 pr-4 text-gray-500">{p.university_id || '—'}</td>
                     <td className="py-2.5 pr-4 text-gray-500">{p.gender || '—'}</td>
