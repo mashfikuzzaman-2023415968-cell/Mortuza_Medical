@@ -1,7 +1,7 @@
 import {
   Shield, CreditCard, Stethoscope, Pill, FlaskConical, User,
   BarChart3, Users, Hash, Calendar, Ambulance, ClipboardList,
-  Clock, BedDouble, AlertTriangle, FileText, HeartPulse, UserCheck,
+  Clock, BedDouble, AlertTriangle, FileText, HeartPulse, UserCheck, Building2,
 } from 'lucide-react';
 
 export const ROLES = [
@@ -18,9 +18,11 @@ export const NAV = {
     { k: 'dash', l: 'Dashboard', i: BarChart3 },
     { k: 'pending', l: 'Pending Requests', i: UserCheck },
     { k: 'doctors', l: 'Doctors', i: Stethoscope },
+    { k: 'units', l: 'Units', i: Building2 },
     { k: 'roster', l: 'Duty roster', i: Calendar },
     { k: 'ambulance', l: 'Ambulances', i: Ambulance },
     { k: 'reports', l: 'Reports', i: BarChart3 },
+    { k: 'users', l: 'Users', i: Users },
   ],
   RECEPTIONIST: [
     { k: 'dash', l: 'Dashboard', i: BarChart3 },

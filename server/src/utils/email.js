@@ -8,6 +8,8 @@ const transporter = smtpConfigured
       port: Number(process.env.SMTP_PORT),
       secure: Number(process.env.SMTP_PORT) === 465,
       auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      // Force IPv4 — Gmail resolves to IPv6 on some networks which may be unreachable
+      family: 4,
     })
   : null;
 

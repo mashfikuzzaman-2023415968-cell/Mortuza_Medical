@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Eye, EyeOff, AlertCircle, MailWarning, Loader2, HeartPulse } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle, MailWarning, Loader2, HeartPulse, Sun, Moon } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const { dark, toggle } = useTheme();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -73,7 +75,16 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-sky-50 to-teal-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-sky-50 to-teal-50 flex items-center justify-center p-4 relative">
+      {/* Theme toggle — top-right corner */}
+      <button
+        onClick={toggle}
+        title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+        className="absolute top-4 right-4 p-2 rounded-lg bg-white text-gray-400 hover:text-gray-600 hover:bg-gray-100 shadow-sm transition-colors"
+      >
+        {dark ? <Sun size={18} /> : <Moon size={18} />}
+      </button>
+
       <div className="w-full max-w-lg">
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-3">

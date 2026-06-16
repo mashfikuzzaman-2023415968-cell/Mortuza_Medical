@@ -27,8 +27,11 @@ export default function VerifyEmailPage() {
       .get('/auth/verify-email', { params: { token } })
       .then((res) => {
         setStatus('success');
-        if (res.data.is_active === false) {
+        const { role, is_active } = res.data;
+        if (is_active === false) {
           setMessage('Email verified! Your account is now pending admin approval. You will be able to log in once an administrator approves your account.');
+        } else if (role === 'PATIENT') {
+          setMessage('Email verified! You can now log in to view your visits, prescriptions, and test results.');
         } else {
           setMessage('Email verified! You can now log in.');
         }

@@ -8,6 +8,40 @@ const router = express.Router();
 
 const VALID_ROLES = ['ADMIN', 'DOCTOR', 'RECEPTIONIST', 'PHARMACIST', 'LAB_TECH', 'PATIENT'];
 
+// GET /api/users - list all users (ADMIN only)
+router.get('/', verifyToken, authorize(), async (req, res) => {
+  try {
+    const { role, search } = req.query;
+    const conditions = [];
+    const params = [];
+
+    if (role) {
+      params.push(role);
+      conditions.push(`u.role = $${params.length}`);
+    }
+    if (search) {
+      params.push(`%${search}%`);
+      conditions.push(`(u.username ILIKE $${params.length} OR u.email ILIKE $${params.length})`);
+    }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const result = await pool.query(
+      `SELECT u.user_id, u.username, u.email, u.role, u.is_active, u.email_verified, u.created_at,
+              d.full_name AS doctor_name, p.full_name AS patient_name
+       FROM app_user u
+       LEFT JOIN doctor d ON d.doctor_id = u.doctor_id
+       LEFT JOIN patient p ON p.patient_id = u.patient_id
+       ${where}
+       ORDER BY u.created_at DESC`,
+      params
+    );
+    return res.json({ success: true, data: result.rows, count: result.rows.length });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
 // GET /api/users/pending - list users awaiting admin approval
 router.get('/pending', verifyToken, authorize('ADMIN'), async (req, res) => {
   try {
@@ -79,6 +113,20 @@ router.post('/', verifyToken, authorize('ADMIN'), async (req, res) => {
     if (password.length < 6) {
       return res.status(400).json({ success: false, error: 'Password must be at least 6 characters' });
     }
+    if (role === 'DOCTOR' && !doctor_id) {
+      return res.status(400).json({ success: false, error: 'doctor_id is required when creating a DOCTOR account' });
+    }
+    if (role === 'PATIENT' && !patient_id) {
+      return res.status(400).json({ success: false, error: 'patient_id is required when creating a PATIENT account' });
+    }
+    if (doctor_id) {
+      const docCheck = await pool.query('SELECT doctor_id FROM doctor WHERE doctor_id = $1', [doctor_id]);
+      if (docCheck.rows.length === 0) return res.status(400).json({ success: false, error: 'doctor_id not found' });
+    }
+    if (patient_id) {
+      const patCheck = await pool.query('SELECT patient_id FROM patient WHERE patient_id = $1', [patient_id]);
+      if (patCheck.rows.length === 0) return res.status(400).json({ success: false, error: 'patient_id not found' });
+    }
 
     const existing = await pool.query(
       'SELECT user_id FROM app_user WHERE username = $1 OR email = $2',
@@ -98,6 +146,40 @@ router.post('/', verifyToken, authorize('ADMIN'), async (req, res) => {
     );
 
     return res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
+// PUT /api/users/:id - toggle is_active (ADMIN only) with last-admin guard
+router.put('/:id', verifyToken, authorize(), async (req, res) => {
+  try {
+    const { is_active } = req.body;
+    if (is_active === undefined) {
+      return res.status(400).json({ success: false, error: 'is_active is required' });
+    }
+
+    const target = await pool.query('SELECT user_id, role, is_active FROM app_user WHERE user_id = $1', [req.params.id]);
+    if (target.rows.length === 0) return res.status(404).json({ success: false, error: 'User not found' });
+    const user = target.rows[0];
+
+    // Guard: prevent deactivating the last active admin
+    if (!is_active && user.role === 'ADMIN') {
+      const adminCount = await pool.query(
+        'SELECT COUNT(*) AS cnt FROM app_user WHERE role = $1 AND is_active = TRUE AND user_id != $2',
+        ['ADMIN', req.params.id]
+      );
+      if (Number(adminCount.rows[0].cnt) === 0) {
+        return res.status(400).json({ success: false, error: 'Cannot deactivate the only active admin account' });
+      }
+    }
+
+    const result = await pool.query(
+      'UPDATE app_user SET is_active = $1 WHERE user_id = $2 RETURNING user_id, username, role, is_active',
+      [!!is_active, req.params.id]
+    );
+    return res.json({ success: true, data: result.rows[0] });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ success: false, error: 'Server error' });

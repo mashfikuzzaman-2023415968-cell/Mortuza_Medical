@@ -18,7 +18,7 @@ const ROLES_REQUIRING_APPROVAL = ['DOCTOR', 'RECEPTIONIST', 'PHARMACIST', 'LAB_T
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
   try {
-    const { username, password, email, role, doctor_id, patient_id } = req.body;
+    const { username, password, email, role } = req.body;
 
     if (!username || !password || !email || !role) {
       return res.status(400).json({ success: false, error: 'username, password, email and role are required' });
@@ -33,6 +33,78 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Password must be at least 6 characters' });
     }
 
+    // ── PATIENT: link-to-existing-record flow ──────────────────────────────
+    if (role === 'PATIENT') {
+      const { university_id, health_card_number } = req.body;
+
+      if (!university_id && !health_card_number) {
+        return res.status(400).json({ success: false, error: 'Provide your University ID or Health Card Number to find your patient record' });
+      }
+
+      // Look up the patient record by whichever identifier was provided
+      let patientRow;
+      if (university_id) {
+        const r = await pool.query(
+          'SELECT patient_id, full_name FROM patient WHERE university_id = $1',
+          [university_id.trim()]
+        );
+        patientRow = r.rows[0];
+      } else {
+        const r = await pool.query(
+          `SELECT p.patient_id, p.full_name
+           FROM health_card hc
+           JOIN patient p ON hc.patient_id = p.patient_id
+           WHERE hc.card_number = $1`,
+          [health_card_number.trim()]
+        );
+        patientRow = r.rows[0];
+      }
+
+      if (!patientRow) {
+        return res.status(404).json({
+          success: false,
+          error: 'No patient record found with this ID. Please visit the Medical Centre reception desk to register first.',
+        });
+      }
+
+      // Check if a portal account already exists for this patient record
+      const existingPortal = await pool.query(
+        'SELECT user_id FROM app_user WHERE patient_id = $1',
+        [patientRow.patient_id]
+      );
+      if (existingPortal.rows.length > 0) {
+        return res.status(409).json({ success: false, error: 'A portal account already exists for this patient record.' });
+      }
+
+      // Check username and email uniqueness separately for clearer error messages
+      const takenUsername = await pool.query('SELECT user_id FROM app_user WHERE username = $1', [username]);
+      if (takenUsername.rows.length > 0) {
+        return res.status(409).json({ success: false, error: 'Username already taken' });
+      }
+      const takenEmail = await pool.query('SELECT user_id FROM app_user WHERE email = $1', [email]);
+      if (takenEmail.rows.length > 0) {
+        return res.status(409).json({ success: false, error: 'Email is already registered' });
+      }
+
+      const passwordHash = await bcrypt.hash(password, 10);
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+
+      await pool.query(
+        `INSERT INTO app_user (username, password_hash, role, patient_id, email, verification_token, email_verified, is_active)
+         VALUES ($1, $2, 'PATIENT', $3, $4, $5, FALSE, TRUE)`,
+        [username, passwordHash, patientRow.patient_id, email, verificationToken]
+      );
+
+      await sendVerificationEmail(email, verificationToken);
+
+      return res.status(201).json({
+        success: true,
+        message: `Account created for ${patientRow.full_name}. Check your email to verify.`,
+        patient_name: patientRow.full_name,
+      });
+    }
+
+    // ── Non-patient roles: existing flow unchanged ─────────────────────────
     const existing = await pool.query(
       'SELECT user_id FROM app_user WHERE username = $1 OR email = $2',
       [username, email]
@@ -43,14 +115,13 @@ router.post('/register', async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, 10);
     const verificationToken = crypto.randomBytes(32).toString('hex');
-    // PATIENT accounts are self-approved (is_active = TRUE once verified).
-    // Staff roles require admin approval (is_active = FALSE until approved).
+    // Staff roles require admin approval; all others (currently none) are auto-active.
     const isActive = !ROLES_REQUIRING_APPROVAL.includes(role);
 
     await pool.query(
       `INSERT INTO app_user (username, password_hash, role, doctor_id, patient_id, email, verification_token, email_verified, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, $8)`,
-      [username, passwordHash, role, doctor_id || null, patient_id || null, email, verificationToken, isActive]
+       VALUES ($1, $2, $3, NULL, NULL, $4, $5, FALSE, $6)`,
+      [username, passwordHash, role, email, verificationToken, isActive]
     );
 
     await sendVerificationEmail(email, verificationToken);
@@ -99,6 +170,21 @@ router.post('/login', async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRES_IN }
     );
 
+    let doctorInfo = {};
+    if (user.role === 'DOCTOR' && user.doctor_id) {
+      const docResult = await pool.query(
+        'SELECT full_name, unit_id, doctor_type FROM doctor WHERE doctor_id = $1',
+        [user.doctor_id]
+      );
+      if (docResult.rows.length > 0) {
+        doctorInfo = {
+          doctor_name: docResult.rows[0].full_name,
+          unit_id: docResult.rows[0].unit_id,
+          doctor_type: docResult.rows[0].doctor_type,
+        };
+      }
+    }
+
     return res.json({
       success: true,
       data: {
@@ -110,6 +196,7 @@ router.post('/login', async (req, res) => {
           doctor_id: user.doctor_id,
           patient_id: user.patient_id,
           email: user.email,
+          ...doctorInfo,
         },
       },
     });

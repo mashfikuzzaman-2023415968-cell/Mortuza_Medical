@@ -5,6 +5,36 @@ import DashboardLayout from '../components/DashboardLayout';
 import { useAuth } from '../context/AuthContext';
 import { NAV, ROLE_LABEL } from '../config/roles';
 import api from '../api/axios';
+import ReceptionDashboard from './receptionist/ReceptionDashboard';
+import PatientsPage from './receptionist/PatientsPage';
+import HealthCardsPage from './receptionist/HealthCardsPage';
+import TokensPage from './receptionist/TokensPage';
+import ReceptionAmbulancePage from './receptionist/AmbulancePage';
+import DoctorDashboard from './doctor/DoctorDashboard';
+import QueuePage from './doctor/QueuePage';
+import VisitsPage from './doctor/VisitsPage';
+import TestOrdersPage from './doctor/TestOrdersPage';
+import AdmissionsPage from './doctor/AdmissionsPage';
+import PharmacyDashboard from './pharmacist/PharmacyDashboard';
+import DispenseQueue from './pharmacist/DispenseQueue';
+import MedicinesPage from './pharmacist/MedicinesPage';
+import LowStockPage from './pharmacist/LowStockPage';
+import LabDashboard from './lab-tech/LabDashboard';
+import PendingTestsPage from './lab-tech/PendingTestsPage';
+import ResultsHistoryPage from './lab-tech/ResultsHistoryPage';
+import CataloguePage from './lab-tech/CataloguePage';
+import PatientDashboard from './patient/PatientDashboard';
+import PatientVisitsPage from './patient/PatientVisitsPage';
+import PatientPrescriptionsPage from './patient/PatientPrescriptionsPage';
+import PatientTestResultsPage from './patient/PatientTestResultsPage';
+import PatientHealthCardPage from './patient/PatientHealthCardPage';
+import AdminDashboard from './admin/AdminDashboard';
+import DoctorsPage from './admin/DoctorsPage';
+import UnitsPage from './admin/UnitsPage';
+import RosterPage from './admin/RosterPage';
+import AmbulancePage from './admin/AmbulancePage';
+import ReportsPage from './admin/ReportsPage';
+import AdminUsersPage from './admin/AdminUsersPage';
 
 function PendingApprovals() {
   const [users, setUsers] = useState([]);
@@ -138,10 +168,63 @@ export default function DashboardHome() {
             </p>
           </div>
 
-          {user.role === 'ADMIN' && <PendingApprovals />}
+          {user.role === 'ADMIN' && <AdminDashboard onNavChange={setNav} />}
+          {user.role === 'RECEPTIONIST' && <ReceptionDashboard onNavChange={setNav} />}
+          {user.role === 'DOCTOR' && <DoctorDashboard onNavChange={setNav} />}
+          {user.role === 'PHARMACIST' && <PharmacyDashboard onNavChange={setNav} />}
+          {user.role === 'LAB_TECH' && <LabDashboard onNavChange={setNav} />}
+          {user.role === 'PATIENT' && <PatientDashboard onNavChange={setNav} />}
         </div>
       ) : nav === 'pending' && user.role === 'ADMIN' ? (
         <PendingApprovals />
+      ) : nav === 'doctors' && user.role === 'ADMIN' ? (
+        <DoctorsPage />
+      ) : nav === 'units' && user.role === 'ADMIN' ? (
+        <UnitsPage />
+      ) : nav === 'roster' && user.role === 'ADMIN' ? (
+        <RosterPage />
+      ) : nav === 'ambulance' && user.role === 'ADMIN' ? (
+        <AmbulancePage />
+      ) : nav === 'reports' && user.role === 'ADMIN' ? (
+        <ReportsPage />
+      ) : nav === 'users' && user.role === 'ADMIN' ? (
+        <AdminUsersPage />
+      ) : nav === 'patients' && user.role === 'RECEPTIONIST' ? (
+        <PatientsPage />
+      ) : nav === 'cards' && user.role === 'RECEPTIONIST' ? (
+        <HealthCardsPage />
+      ) : nav === 'tokens' && user.role === 'RECEPTIONIST' ? (
+        <TokensPage />
+      ) : nav === 'ambulance' && user.role === 'RECEPTIONIST' ? (
+        <ReceptionAmbulancePage />
+      ) : nav === 'queue' && user.role === 'DOCTOR' ? (
+        <QueuePage />
+      ) : nav === 'visits' && user.role === 'DOCTOR' ? (
+        <VisitsPage />
+      ) : nav === 'tests' && user.role === 'DOCTOR' ? (
+        <TestOrdersPage />
+      ) : nav === 'admissions' && user.role === 'DOCTOR' ? (
+        <AdmissionsPage />
+      ) : nav === 'dispense' && user.role === 'PHARMACIST' ? (
+        <DispenseQueue />
+      ) : nav === 'stock' && user.role === 'PHARMACIST' ? (
+        <MedicinesPage />
+      ) : nav === 'lowstock' && user.role === 'PHARMACIST' ? (
+        <LowStockPage />
+      ) : nav === 'pending' && user.role === 'LAB_TECH' ? (
+        <PendingTestsPage />
+      ) : nav === 'results' && user.role === 'LAB_TECH' ? (
+        <ResultsHistoryPage />
+      ) : nav === 'catalogue' && user.role === 'LAB_TECH' ? (
+        <CataloguePage />
+      ) : nav === 'visits' && user.role === 'PATIENT' ? (
+        <PatientVisitsPage />
+      ) : nav === 'rx' && user.role === 'PATIENT' ? (
+        <PatientPrescriptionsPage />
+      ) : nav === 'tests' && user.role === 'PATIENT' ? (
+        <PatientTestResultsPage />
+      ) : nav === 'card' && user.role === 'PATIENT' ? (
+        <PatientHealthCardPage />
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <h3 className="text-lg font-semibold text-gray-800">{current?.l}</h3>
