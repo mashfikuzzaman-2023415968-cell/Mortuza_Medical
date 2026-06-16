@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../config/db');
 const { verifyToken, authorize } = require('../middleware/auth');
+const { sendTestResultEmail } = require('../utils/email');
 
 const router = express.Router();
 
@@ -187,7 +188,35 @@ router.put('/:id/result', verifyToken, authorize('LAB_TECH'), async (req, res) =
       ]
     );
 
-    return res.json({ success: true, data: updateResult.rows[0] });
+    const finalOrder = updateResult.rows[0];
+
+    // Send result email to patient — fire and forget, never block the response
+    if (newStatus === 'COMPLETED') {
+      pool.query(
+        `SELECT p.full_name, dt.test_name, dt.normal_range,
+                COALESCE(u.email, p.email) AS email
+         FROM patient p
+         JOIN diagnostic_test dt ON dt.test_id = $2
+         LEFT JOIN portal_user u ON u.patient_id = p.patient_id AND u.email_verified = TRUE
+         WHERE p.patient_id = $1
+         LIMIT 1`,
+        [finalOrder.patient_id, finalOrder.test_id]
+      ).then(({ rows }) => {
+        if (rows.length && rows[0].email) {
+          return sendTestResultEmail({
+            to: rows[0].email,
+            patientName: rows[0].full_name,
+            testName: rows[0].test_name,
+            resultValue: finalOrder.result_value,
+            normalRange: rows[0].normal_range,
+            resultDate: finalOrder.result_date,
+            remarks: finalOrder.remarks,
+          });
+        }
+      }).catch((err) => console.error('[email] Test result email failed:', err));
+    }
+
+    return res.json({ success: true, data: finalOrder });
   } catch (err) {
     if (err.code === '22001') return res.status(400).json({ success: false, error: 'result_value is too long (max 100 characters)' });
     console.error(err);
