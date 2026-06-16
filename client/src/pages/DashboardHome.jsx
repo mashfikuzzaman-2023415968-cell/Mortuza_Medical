@@ -36,6 +36,57 @@ import AmbulancePage from './admin/AmbulancePage';
 import ReportsPage from './admin/ReportsPage';
 import AdminUsersPage from './admin/AdminUsersPage';
 
+const ROLE_WELCOME = {
+  ADMIN: {
+    tagline: 'Full command of Mortuza Medical Centre is at your fingertips.',
+    tip: 'Monitor today\'s activity, manage pending approvals, keep the ambulance fleet ready, and generate reports — all from one place.',
+    color: 'text-rose-600',
+    bg: 'bg-rose-50',
+    border: 'border-rose-100',
+    dot: 'bg-rose-400',
+  },
+  RECEPTIONIST: {
+    tagline: 'You\'re the first face patients see — make every interaction count.',
+    tip: 'Register new patients, issue health cards, manage the token queue, and coordinate ambulance dispatches.',
+    color: 'text-sky-600',
+    bg: 'bg-sky-50',
+    border: 'border-sky-100',
+    dot: 'bg-sky-400',
+  },
+  DOCTOR: {
+    tagline: 'Your patients came because they trust you. Let\'s get to work.',
+    tip: 'Check today\'s queue, log visit notes, order lab tests, write prescriptions, and manage admissions.',
+    color: 'text-emerald-600',
+    bg: 'bg-emerald-50',
+    border: 'border-emerald-100',
+    dot: 'bg-emerald-400',
+  },
+  PHARMACIST: {
+    tagline: 'Every dispensed prescription completes someone\'s care.',
+    tip: 'Work through the dispense queue, keep stock levels accurate, and flag critical shortages before they become a problem.',
+    color: 'text-amber-600',
+    bg: 'bg-amber-50',
+    border: 'border-amber-100',
+    dot: 'bg-amber-400',
+  },
+  LAB_TECH: {
+    tagline: 'Precision here. Diagnosis there. You connect the two.',
+    tip: 'Process pending test orders, record results with accuracy, and keep the diagnostic catalogue up to date.',
+    color: 'text-violet-600',
+    bg: 'bg-violet-50',
+    border: 'border-violet-100',
+    dot: 'bg-violet-400',
+  },
+  PATIENT: {
+    tagline: 'Your health record, always with you.',
+    tip: 'View your past visits, review prescriptions from your doctor, and check lab test results — anytime, in one place.',
+    color: 'text-teal-600',
+    bg: 'bg-teal-50',
+    border: 'border-teal-100',
+    dot: 'bg-teal-400',
+  },
+};
+
 function PendingApprovals() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -159,13 +210,29 @@ export default function DashboardHome() {
       {nav === 'dash' ? (
         <div className="space-y-6">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <h3 className="text-lg font-semibold text-gray-800">Welcome, {user.username}</h3>
-            <p className="text-sm text-gray-500 mt-1">
-              You're signed in as <span className="font-medium text-gray-700">{ROLE_LABEL[user.role]}</span>.
-            </p>
-            <p className="text-sm text-gray-400 mt-4">
-              This is the authentication skeleton — role-specific pages will be built in upcoming phases.
-            </p>
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800">Welcome back, {user.username}</h3>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  Signed in as <span className="font-medium text-gray-700">{ROLE_LABEL[user.role]}</span>
+                  {' · '}
+                  <span className="text-gray-400">{new Date().toLocaleDateString('en-BD', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                </p>
+              </div>
+            </div>
+            {ROLE_WELCOME[user.role] && (
+              <div className={`mt-4 rounded-xl border ${ROLE_WELCOME[user.role].border} ${ROLE_WELCOME[user.role].bg} px-4 py-3 flex gap-3 items-start`}>
+                <span className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${ROLE_WELCOME[user.role].dot}`} />
+                <div>
+                  <p className={`text-sm font-semibold ${ROLE_WELCOME[user.role].color}`}>
+                    {ROLE_WELCOME[user.role].tagline}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                    {ROLE_WELCOME[user.role].tip}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {user.role === 'ADMIN' && <AdminDashboard onNavChange={setNav} />}
