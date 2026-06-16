@@ -34,7 +34,12 @@ function PrescriptionDetail({ prescriptionId, onBack }) {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
         <div className="flex items-center gap-2 mb-4">
           <ClipboardList size={18} className="text-sky-500" />
-          <h3 className="text-lg font-semibold text-gray-800">Prescription #{rx.prescription_id}</h3>
+          <h3 className="text-lg font-semibold text-gray-800">
+            Prescription #{rx.prescription_id}
+            <span className="ml-2 text-sm font-normal text-gray-400">
+              · {rx.prescription_date ? new Date(rx.prescription_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+            </span>
+          </h3>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-600 mb-4">
           <div><span className="text-gray-400">Doctor:</span> <span className="font-medium text-gray-700">{rx.doctor_name}</span></div>
@@ -133,12 +138,13 @@ export default function PatientPrescriptionsPage() {
                 <ClipboardList size={15} className="text-sky-500" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800">Prescription #{rx.prescription_id}</p>
-                <div className="flex gap-3 mt-0.5 text-xs text-gray-400 flex-wrap">
-                  <span>Dr. {rx.doctor_name}</span>
-                  <span>·</span>
-                  <span>{rx.prescription_date?.slice(0, 10)}</span>
-                </div>
+                <p className="text-sm font-medium text-gray-800">
+                  Prescription #{rx.prescription_id}
+                  <span className="ml-2 text-gray-400 font-normal">
+                    · {rx.prescription_date ? new Date(rx.prescription_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                  </span>
+                </p>
+                <p className="mt-0.5 text-xs text-gray-400">Dr. {rx.doctor_name}</p>
               </div>
               <ChevronRight size={16} className="text-gray-300 flex-shrink-0" />
             </button>
