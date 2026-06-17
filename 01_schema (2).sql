@@ -84,7 +84,7 @@ CREATE TABLE token (
   issue_datetime TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   token_date     DATE NOT NULL DEFAULT CURRENT_DATE,
   status         VARCHAR(10) NOT NULL DEFAULT 'WAITING'
-                 CHECK (status IN ('WAITING','SERVED','CANCELLED')),
+                 CHECK (status IN ('WAITING','SERVED','CANCELLED','EXPIRED')),
   UNIQUE (unit_id, token_date, token_number)
 );
 

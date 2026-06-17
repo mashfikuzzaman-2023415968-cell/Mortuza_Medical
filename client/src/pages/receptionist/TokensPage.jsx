@@ -10,12 +10,14 @@ const STATUS_STYLES = {
   WAITING: 'bg-amber-100 text-amber-700',
   SERVED: 'bg-emerald-100 text-emerald-700',
   CANCELLED: 'bg-gray-100 text-gray-500',
+  EXPIRED: 'bg-gray-100 text-gray-500',
 };
 
 const STATUS_ICONS = {
   WAITING: Clock,
   SERVED: CheckCircle2,
   CANCELLED: XCircle,
+  EXPIRED: XCircle,
 };
 
 function fmtDate(d) {

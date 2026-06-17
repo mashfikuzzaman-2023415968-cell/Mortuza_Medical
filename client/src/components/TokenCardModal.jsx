@@ -69,6 +69,8 @@ export default function TokenCardModal({ tokenId, onClose }) {
   const handleBackdropClick = (e) => { if (e.target === backdropRef.current) onClose(); };
 
   const isCancelled = token?.status === 'CANCELLED';
+  const isExpired = token?.status === 'EXPIRED';
+  const isVoid = isCancelled || isExpired;
 
   return (
     <div
@@ -117,12 +119,13 @@ export default function TokenCardModal({ tokenId, onClose }) {
             </div>
           ) : token ? (
             <>
-              {/* Cancelled watermark */}
-              {isCancelled && (
-                <div className="bg-red-50 border-b border-red-200 px-4 py-1.5 flex items-center justify-center gap-2">
-                  <AlertCircle size={14} className="text-red-500" />
-                  <span className="text-xs font-bold text-red-600 tracking-widest uppercase">
-                    This token has been cancelled
+              {/* Cancelled / Expired watermark */}
+              {isVoid && (
+                <div className={`border-b px-4 py-1.5 flex items-center justify-center gap-2
+                  ${isExpired ? 'bg-gray-50 border-gray-200' : 'bg-red-50 border-red-200'}`}>
+                  <AlertCircle size={14} className={isExpired ? 'text-gray-500' : 'text-red-500'} />
+                  <span className={`text-xs font-bold tracking-widest uppercase ${isExpired ? 'text-gray-600' : 'text-red-600'}`}>
+                    {isExpired ? 'This token has expired' : 'This token has been cancelled'}
                   </span>
                 </div>
               )}
@@ -131,8 +134,8 @@ export default function TokenCardModal({ tokenId, onClose }) {
               <div className="pt-5 pb-3 flex flex-col items-center">
                 <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Token Number</p>
                 <div className={`w-24 h-24 rounded-full flex items-center justify-center border-4 shadow-inner
-                  ${isCancelled ? 'border-red-200 bg-red-50' : 'border-teal-100 bg-teal-50'}`}>
-                  <span className={`text-4xl font-black ${isCancelled ? 'text-red-400 line-through' : 'text-teal-700'}`}>
+                  ${isExpired ? 'border-gray-200 bg-gray-50' : isCancelled ? 'border-red-200 bg-red-50' : 'border-teal-100 bg-teal-50'}`}>
+                  <span className={`text-4xl font-black ${isExpired ? 'text-gray-400 line-through' : isCancelled ? 'text-red-400 line-through' : 'text-teal-700'}`}>
                     {token.token_number}
                   </span>
                 </div>

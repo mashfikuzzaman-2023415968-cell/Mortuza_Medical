@@ -111,6 +111,14 @@ function PendingCard({ req, onApproved, onRejected }) {
         )}
       </div>
 
+      {/* No-doctor warning — does not block approval */}
+      {Number(req.rostered_doctors) === 0 && (
+        <div className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          <AlertCircle size={13} className="flex-shrink-0" />
+          No doctor is currently rostered for this unit on this date
+        </div>
+      )}
+
       {error && (
         <div className="flex items-center gap-1.5 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
           <AlertCircle size={14} /> {error}

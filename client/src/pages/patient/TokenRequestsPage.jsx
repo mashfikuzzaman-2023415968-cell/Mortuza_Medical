@@ -12,6 +12,7 @@ const TOKEN_STATUS = {
   WAITING:   { cls: 'bg-amber-100 text-amber-700',    Icon: Clock,          label: 'Waiting'   },
   SERVED:    { cls: 'bg-emerald-100 text-emerald-700', Icon: CheckCircle2,  label: 'Served'    },
   CANCELLED: { cls: 'bg-gray-100 text-gray-500',       Icon: XCircle,       label: 'Cancelled' },
+  EXPIRED:   { cls: 'bg-gray-100 text-gray-500',       Icon: XCircle,       label: 'Expired'   },
 };
 
 const SOURCE = {
@@ -66,7 +67,19 @@ function ActiveTokenCard({ token, source, onView }) {
 }
 
 /* ── online-pending request card (no token yet) ───────────────────────── */
-function PendingRequestCard({ req }) {
+function PendingRequestCard({ req, onCancel }) {
+  const [cancelling, setCancelling] = useState(false);
+
+  const handleCancel = async () => {
+    if (!window.confirm('Cancel this token request? This cannot be undone.')) return;
+    setCancelling(true);
+    try {
+      await onCancel(req.request_id);
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
       <div className="flex items-center gap-3">
@@ -81,9 +94,18 @@ function PendingRequestCard({ req }) {
           )}
         </div>
       </div>
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-200 text-amber-800 flex-shrink-0">
-        <Clock size={11} /> Online – Pending
-      </span>
+      <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-200 text-amber-800">
+          <Clock size={11} /> Online – Pending
+        </span>
+        <button
+          onClick={handleCancel}
+          disabled={cancelling}
+          className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+        >
+          {cancelling ? <Loader2 size={11} className="animate-spin" /> : <XCircle size={11} />} Cancel
+        </button>
+      </div>
     </div>
   );
 }
@@ -232,6 +254,17 @@ export default function PatientTokenRequestsPage() {
     }
   };
 
+  const handleCancelRequest = async (requestId) => {
+    try {
+      await api.put(`/token-requests/${requestId}/cancel`);
+      setToast('Your token request has been cancelled.');
+      loadData();
+      setTimeout(() => setToast(''), 5000);
+    } catch (err) {
+      setFormError(err.response?.data?.error || 'Unable to cancel request.');
+    }
+  };
+
   /* ── render ──────────────────────────────────────────────────────── */
   return (
     <div className="space-y-6">
@@ -260,7 +293,7 @@ export default function PatientTokenRequestsPage() {
           <div className="space-y-2">
             {/* Online-pending: request submitted, awaiting review */}
             {pendingRequests.map((req) => (
-              <PendingRequestCard key={`req-${req.request_id}`} req={req} />
+              <PendingRequestCard key={`req-${req.request_id}`} req={req} onCancel={handleCancelRequest} />
             ))}
             {/* Active issued tokens (within 48 h, not CANCELLED) */}
             {activeTokens.map((t) => (

@@ -116,7 +116,9 @@ router.get('/pending', verifyToken, authorize('RECEPTIONIST'), async (req, res) 
     const result = await pool.query(
       `SELECT tr.*, u.unit_name,
               p.full_name AS patient_name, p.patient_category,
-              hc.card_number, hc.status AS card_status, hc.expiry_date AS card_expiry
+              hc.card_number, hc.status AS card_status, hc.expiry_date AS card_expiry,
+              (SELECT COUNT(*) FROM duty_roster dr
+               WHERE dr.unit_id = tr.unit_id AND dr.duty_date = tr.preferred_date) AS rostered_doctors
        FROM token_request tr
        JOIN unit u ON u.unit_id = tr.unit_id
        JOIN patient p ON p.patient_id = tr.patient_id
@@ -212,6 +214,21 @@ router.put('/:id/approve', verifyToken, authorize('RECEPTIONIST'), async (req, r
     // preferred_date may come back as a Date or a string depending on the
     // pg type parser; normalise to a YYYY-MM-DD string either way.
     const prefDateStr = new Date(tokenReq.preferred_date).toISOString().slice(0, 10);
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Past-date check — auto-reject, never create a token for a date that has passed.
+    if (prefDateStr < today) {
+      const rejResult = await client.query(
+        `UPDATE token_request
+         SET status = 'REJECTED', reject_reason = $1, reviewed_by = $2, reviewed_at = NOW()
+         WHERE request_id = $3 AND status = 'PENDING' RETURNING *`,
+        ['Request date has passed. Please submit a new request.', req.user.user_id, req.params.id]
+      );
+      if (rejResult.rowCount === 0) {
+        return res.status(400).json({ success: false, error: 'Request has already been processed' });
+      }
+      return res.json({ success: true, auto_rejected: true, data: rejResult.rows[0] });
+    }
 
     // Re-validate health card
     const cardCheck = await validateCard(client, tokenReq.patient_id, prefDateStr);
@@ -220,9 +237,12 @@ router.put('/:id/approve', verifyToken, authorize('RECEPTIONIST'), async (req, r
       const rejResult = await client.query(
         `UPDATE token_request
          SET status = 'REJECTED', reject_reason = $1, reviewed_by = $2, reviewed_at = NOW()
-         WHERE request_id = $3 RETURNING *`,
+         WHERE request_id = $3 AND status = 'PENDING' RETURNING *`,
         ['Health card no longer valid', req.user.user_id, req.params.id]
       );
+      if (rejResult.rowCount === 0) {
+        return res.status(400).json({ success: false, error: 'Request has already been processed' });
+      }
       return res.json({ success: true, auto_rejected: true, data: rejResult.rows[0] });
     }
 
@@ -241,12 +261,21 @@ router.put('/:id/approve', verifyToken, authorize('RECEPTIONIST'), async (req, r
       [nextNumber, cardCheck.card.card_id, tokenReq.unit_id, prefDateStr]
     );
 
+    // Atomic concurrency guard: only the approval that flips the row out of
+    // PENDING wins. If another receptionist got there first, rowCount is 0 and
+    // we roll back the token we just inserted.
     const updResult = await client.query(
       `UPDATE token_request
-       SET status = 'APPROVED', reviewed_by = $1, reviewed_at = NOW(), token_id = $2
-       WHERE request_id = $3 RETURNING *`,
-      [req.user.user_id, newToken.rows[0].token_id, req.params.id]
+       SET status = 'APPROVED', reviewed_by = $2, reviewed_at = NOW(), token_id = $3
+       WHERE request_id = $1 AND status = 'PENDING'
+       RETURNING *`,
+      [req.params.id, req.user.user_id, newToken.rows[0].token_id]
     );
+
+    if (updResult.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, error: 'Request has already been processed' });
+    }
 
     await client.query('COMMIT');
 
@@ -293,6 +322,40 @@ router.put('/:id/reject', verifyToken, authorize('RECEPTIONIST'), async (req, re
        WHERE request_id = $3 RETURNING *`,
       [reject_reason.trim(), req.user.user_id, req.params.id]
     );
+
+    return res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
+// PUT /api/token-requests/:id/cancel — PATIENT cancels own pending request
+router.put('/:id/cancel', verifyToken, authorize('PATIENT'), async (req, res) => {
+  try {
+    const existing = await pool.query(
+      'SELECT patient_id, status FROM token_request WHERE request_id = $1',
+      [req.params.id]
+    );
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Token request not found' });
+    }
+    if (Number(existing.rows[0].patient_id) !== Number(req.user.patient_id)) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    if (existing.rows[0].status !== 'PENDING') {
+      return res.status(400).json({ success: false, error: 'Can only cancel pending requests' });
+    }
+
+    const result = await pool.query(
+      `UPDATE token_request
+       SET status = 'REJECTED', reject_reason = 'Cancelled by patient', reviewed_at = NOW()
+       WHERE request_id = $1 AND status = 'PENDING' RETURNING *`,
+      [req.params.id]
+    );
+    if (result.rowCount === 0) {
+      return res.status(400).json({ success: false, error: 'Can only cancel pending requests' });
+    }
 
     return res.json({ success: true, data: result.rows[0] });
   } catch (err) {

@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../config/db');
 const { verifyToken, authorize } = require('../middleware/auth');
+const { expireStaleTokens } = require('../utils/tokenExpiry');
 
 const router = express.Router();
 
@@ -9,6 +10,7 @@ const router = express.Router();
 // recent first, capped) — used by the receptionist history view.
 router.get('/', verifyToken, authorize('RECEPTIONIST', 'DOCTOR'), async (req, res) => {
   try {
+    await expireStaleTokens(pool);
     const { date, unit_id, scope } = req.query;
     const allScope = scope === 'all';
     const conditions = [];
@@ -122,6 +124,7 @@ router.post('/', verifyToken, authorize('RECEPTIONIST'), async (req, res) => {
 // GET /api/tokens/mine — Patient views own tokens (must come before /:id routes)
 router.get('/mine', verifyToken, authorize('PATIENT'), async (req, res) => {
   try {
+    await expireStaleTokens(pool);
     const result = await pool.query(
       `SELECT t.token_id, t.token_number, t.token_date, t.status,
               t.issue_datetime, u.unit_name, u.floor_location,
@@ -143,6 +146,7 @@ router.get('/mine', verifyToken, authorize('PATIENT'), async (req, res) => {
 // GET /api/tokens/:id/details — full details for the printable card
 router.get('/:id/details', verifyToken, authorize('RECEPTIONIST', 'DOCTOR', 'PATIENT'), async (req, res) => {
   try {
+    await expireStaleTokens(pool);
     const result = await pool.query(
       `SELECT t.token_id, t.token_number, t.token_date, t.status,
               t.issue_datetime, t.unit_id,
