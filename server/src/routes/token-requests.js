@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../config/db');
 const { verifyToken, authorize } = require('../middleware/auth');
+const { expireStaleTokens } = require('../utils/tokenExpiry');
 
 const router = express.Router();
 
@@ -94,8 +95,9 @@ router.post('/', verifyToken, authorize('PATIENT'), async (req, res) => {
 // GET /api/token-requests/my — Patient views own requests (must come before /:id)
 router.get('/my', verifyToken, authorize('PATIENT'), async (req, res) => {
   try {
+    await expireStaleTokens(pool);
     const result = await pool.query(
-      `SELECT tr.*, u.unit_name, t.token_number
+      `SELECT tr.*, u.unit_name, t.token_number, t.status AS token_status
        FROM token_request tr
        JOIN unit u ON u.unit_id = tr.unit_id
        LEFT JOIN token t ON t.token_id = tr.token_id
@@ -197,7 +199,10 @@ router.put('/:id/approve', verifyToken, authorize('RECEPTIONIST'), async (req, r
   const client = await pool.connect();
   try {
     const reqResult = await client.query(
-      `SELECT tr.*, u.unit_name FROM token_request tr
+      `SELECT tr.*, u.unit_name,
+              to_char(tr.preferred_date, 'YYYY-MM-DD') AS preferred_date_str,
+              (tr.preferred_date < CURRENT_DATE) AS is_past
+       FROM token_request tr
        JOIN unit u ON u.unit_id = tr.unit_id
        WHERE tr.request_id = $1`,
       [req.params.id]
@@ -211,13 +216,12 @@ router.put('/:id/approve', verifyToken, authorize('RECEPTIONIST'), async (req, r
       return res.status(400).json({ success: false, error: 'Request has already been processed' });
     }
 
-    // preferred_date may come back as a Date or a string depending on the
-    // pg type parser; normalise to a YYYY-MM-DD string either way.
-    const prefDateStr = new Date(tokenReq.preferred_date).toISOString().slice(0, 10);
-    const today = new Date().toISOString().slice(0, 10);
+    // Use the DB's own notion of the date everywhere so the past-date check and
+    // the issued token_date stay consistent regardless of server timezone.
+    const prefDateStr = tokenReq.preferred_date_str;
 
     // Past-date check — auto-reject, never create a token for a date that has passed.
-    if (prefDateStr < today) {
+    if (tokenReq.is_past) {
       const rejResult = await client.query(
         `UPDATE token_request
          SET status = 'REJECTED', reject_reason = $1, reviewed_by = $2, reviewed_at = NOW()
