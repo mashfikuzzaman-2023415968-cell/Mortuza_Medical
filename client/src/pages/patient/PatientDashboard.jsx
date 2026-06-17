@@ -64,8 +64,12 @@ export default function PatientDashboard({ onNavChange }) {
         prescriptions: (rxRes.data.data || []).length,
         tests: (testsRes.data.data || []).length,
       });
+      // Only surface tokens still waiting in the queue today — served/cancelled
+      // tokens are done and live in the Past Tokens list on the Request page.
       setTodayTokens(
-        (tokensRes.data.data || []).filter((t) => t.token_date?.slice(0, 10) === today)
+        (tokensRes.data.data || []).filter(
+          (t) => t.token_date?.slice(0, 10) === today && t.status === 'WAITING'
+        )
       );
       setRequestedTokenIds(
         new Set(
@@ -158,12 +162,12 @@ export default function PatientDashboard({ onNavChange }) {
         />
       </div>
 
-      {/* Today's tokens */}
+      {/* Today's active (waiting) tokens */}
       {!loading && todayTokens.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center gap-2 mb-3">
             <Hash size={16} className="text-teal-600" />
-            <h3 className="text-sm font-semibold text-gray-800">Today's Token{todayTokens.length > 1 ? 's' : ''}</h3>
+            <h3 className="text-sm font-semibold text-gray-800">Today's Active Token{todayTokens.length > 1 ? 's' : ''}</h3>
           </div>
           <div className="space-y-2">
             {todayTokens.map((t) => {
@@ -172,20 +176,10 @@ export default function PatientDashboard({ onNavChange }) {
                 <button
                   key={t.token_id}
                   onClick={() => setViewTokenId(t.token_id)}
-                  className={`w-full flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-left border transition-shadow hover:shadow-md ${
-                    t.status === 'WAITING'
-                      ? 'border-teal-200 bg-teal-50'
-                      : t.status === 'SERVED'
-                        ? 'border-emerald-100 bg-emerald-50/40'
-                        : 'border-gray-100 bg-gray-50'
-                  }`}
+                  className="w-full flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-left border border-teal-200 bg-teal-50 transition-shadow hover:shadow-md"
                 >
                   <div className="flex items-center gap-3">
-                    <span className={`text-3xl font-extrabold leading-none ${
-                      t.status === 'WAITING' ? 'text-teal-600'
-                      : t.status === 'SERVED' ? 'text-emerald-500'
-                      : 'text-gray-300 line-through'
-                    }`}>
+                    <span className="text-3xl font-extrabold leading-none text-teal-600">
                       #{t.token_number}
                     </span>
                     <div>
@@ -194,21 +188,9 @@ export default function PatientDashboard({ onNavChange }) {
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                    {t.status === 'WAITING' && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-                        <Clock size={10} /> Waiting
-                      </span>
-                    )}
-                    {t.status === 'SERVED' && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
-                        <CheckCircle2 size={10} /> Served
-                      </span>
-                    )}
-                    {t.status === 'CANCELLED' && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
-                        <XCircle size={10} /> Cancelled
-                      </span>
-                    )}
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                      <Clock size={10} /> Waiting
+                    </span>
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
                       isOnline ? 'bg-teal-100 text-teal-700' : 'bg-sky-100 text-sky-700'
                     }`}>

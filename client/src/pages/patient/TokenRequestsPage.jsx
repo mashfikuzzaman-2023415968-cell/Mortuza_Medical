@@ -192,14 +192,16 @@ export default function PatientTokenRequestsPage() {
   const pendingRequests  = myRequests.filter((r) => r.status === 'PENDING');
   const rejectedRequests = myRequests.filter((r) => r.status === 'REJECTED');
 
+  // Active = still WAITING in the queue AND issued within the last 48 h.
+  // Served / Cancelled / expired tokens all drop into Past Tokens.
   const activeTokens = myTokens.filter(
     (t) =>
-      t.status !== 'CANCELLED' &&
+      t.status === 'WAITING' &&
       now - new Date(t.issue_datetime).getTime() < THRESHOLD_MS
   );
   const pastTokens = myTokens.filter(
     (t) =>
-      t.status === 'CANCELLED' ||
+      t.status !== 'WAITING' ||
       now - new Date(t.issue_datetime).getTime() >= THRESHOLD_MS
   );
 

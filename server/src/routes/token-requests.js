@@ -4,17 +4,20 @@ const { verifyToken, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Helper: validate a patient's health card for a given date
+// Helper: validate a patient's health card for a given date.
+// The expiry comparison is done in SQL so it works regardless of whether
+// node-pg returns expiry_date as a Date object or a string.
 async function validateCard(client, patientId, preferredDate) {
   const r = await client.query(
-    'SELECT card_id, status, expiry_date FROM health_card WHERE patient_id = $1',
-    [patientId]
+    `SELECT card_id, status, expiry_date,
+            (expiry_date < $2::date) AS expired_by_date
+     FROM health_card WHERE patient_id = $1`,
+    [patientId, preferredDate]
   );
   if (r.rows.length === 0) return { ok: false, reason: "You don't have a health card. Visit reception first." };
   const card = r.rows[0];
-  const expStr = card.expiry_date.toISOString().slice(0, 10);
   if (card.status !== 'ACTIVE') return { ok: false, reason: 'Your health card is not active' };
-  if (expStr < preferredDate) return { ok: false, reason: 'Your health card will be expired by that date' };
+  if (card.expired_by_date) return { ok: false, reason: 'Your health card will be expired by that date' };
   return { ok: true, card };
 }
 
@@ -206,7 +209,9 @@ router.put('/:id/approve', verifyToken, authorize('RECEPTIONIST'), async (req, r
       return res.status(400).json({ success: false, error: 'Request has already been processed' });
     }
 
-    const prefDateStr = tokenReq.preferred_date.toISOString().slice(0, 10);
+    // preferred_date may come back as a Date or a string depending on the
+    // pg type parser; normalise to a YYYY-MM-DD string either way.
+    const prefDateStr = new Date(tokenReq.preferred_date).toISOString().slice(0, 10);
 
     // Re-validate health card
     const cardCheck = await validateCard(client, tokenReq.patient_id, prefDateStr);
