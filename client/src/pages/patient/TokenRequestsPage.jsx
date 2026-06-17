@@ -1,7 +1,127 @@
 import { useEffect, useState } from 'react';
-import { CalendarPlus, Loader2, CheckCircle2, Clock, XCircle, ExternalLink } from 'lucide-react';
+import { CalendarPlus, Loader2, CheckCircle2, Clock, XCircle, ExternalLink, Hash, Printer } from 'lucide-react';
 import api from '../../api/axios';
 import TokenCardModal from '../../components/TokenCardModal';
+
+const TOKEN_STATUS = {
+  WAITING:   { label: 'Waiting',   cls: 'bg-amber-100 text-amber-700',   Icon: Clock },
+  SERVED:    { label: 'Served',    cls: 'bg-emerald-100 text-emerald-700', Icon: CheckCircle2 },
+  CANCELLED: { label: 'Cancelled', cls: 'bg-gray-100 text-gray-500',      Icon: XCircle },
+};
+
+function MyTokensSection({ viewToken }) {
+  const [tokens, setTokens] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get('/tokens/mine')
+      .then((res) => setTokens(res.data.data || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const todayTokens = tokens.filter((t) => t.token_date?.slice(0, 10) === today);
+  const pastTokens  = tokens.filter((t) => t.token_date?.slice(0, 10) !== today);
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="flex items-center gap-2 text-sm text-gray-400 py-2">
+          <Loader2 size={16} className="animate-spin" /> Loading your tokens…
+        </div>
+      </div>
+    );
+  }
+
+  if (tokens.length === 0) return null;
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+      <div className="flex items-center gap-2">
+        <Hash size={18} className="text-teal-600" />
+        <h3 className="text-lg font-semibold text-gray-800">My Tokens</h3>
+      </div>
+
+      {todayTokens.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Today</p>
+          {todayTokens.map((t) => {
+            const s = TOKEN_STATUS[t.status] || TOKEN_STATUS.WAITING;
+            return (
+              <div key={t.token_id} className={`flex items-center justify-between gap-3 rounded-xl px-4 py-3 border ${t.status === 'WAITING' ? 'border-amber-200 bg-amber-50' : 'border-gray-100 bg-gray-50'}`}>
+                <div className="flex items-center gap-3">
+                  <span className={`text-2xl font-bold ${t.status === 'WAITING' ? 'text-amber-600' : 'text-gray-400'}`}>#{t.token_number}</span>
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{t.unit_name}</p>
+                    {t.floor_location && <p className="text-xs text-gray-400">{t.floor_location}</p>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${s.cls}`}>
+                    <s.Icon size={11} /> {s.label}
+                  </span>
+                  <button
+                    onClick={() => viewToken(t.token_id)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:bg-white"
+                  >
+                    <Printer size={11} /> View
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {pastTokens.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Past tokens</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
+                  <th className="py-2 pr-4 font-medium">Token #</th>
+                  <th className="py-2 pr-4 font-medium">Unit</th>
+                  <th className="py-2 pr-4 font-medium">Date</th>
+                  <th className="py-2 pr-4 font-medium">Status</th>
+                  <th className="py-2 font-medium"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {pastTokens.map((t) => {
+                  const s = TOKEN_STATUS[t.status] || TOKEN_STATUS.WAITING;
+                  return (
+                    <tr key={t.token_id} className="border-b border-gray-50 last:border-0">
+                      <td className="py-2 pr-4 font-semibold text-gray-700">#{t.token_number}</td>
+                      <td className="py-2 pr-4 text-gray-500 text-xs">{t.unit_name}</td>
+                      <td className="py-2 pr-4 text-gray-500 text-xs">
+                        {new Date(t.token_date).toLocaleDateString('en-BD', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </td>
+                      <td className="py-2 pr-4">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${s.cls}`}>
+                          <s.Icon size={11} /> {s.label}
+                        </span>
+                      </td>
+                      <td className="py-2">
+                        <button
+                          onClick={() => viewToken(t.token_id)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-500 hover:bg-gray-50"
+                        >
+                          <Printer size={11} /> View
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function StatusBadge({ req }) {
   if (req.status === 'PENDING') {
@@ -79,6 +199,9 @@ export default function PatientTokenRequestsPage() {
 
   return (
     <div className="space-y-6">
+      {/* My issued tokens (all, any source) */}
+      <MyTokensSection viewToken={setViewTokenId} />
+
       {/* Request form */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
         <div className="flex items-center gap-2 mb-1">

@@ -109,6 +109,27 @@ router.post('/', verifyToken, authorize('RECEPTIONIST'), async (req, res) => {
   }
 });
 
+// GET /api/tokens/mine — Patient views own tokens (must come before /:id routes)
+router.get('/mine', verifyToken, authorize('PATIENT'), async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT t.token_id, t.token_number, t.token_date, t.status,
+              t.issue_datetime, u.unit_name, u.floor_location,
+              hc.card_number
+       FROM token t
+       JOIN health_card hc ON t.health_card_id = hc.card_id
+       JOIN unit u ON t.unit_id = u.unit_id
+       WHERE hc.patient_id = $1
+       ORDER BY t.token_date DESC, t.token_number ASC`,
+      [req.user.patient_id]
+    );
+    return res.json({ success: true, data: result.rows });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
 // GET /api/tokens/:id/details — full details for the printable card
 router.get('/:id/details', verifyToken, authorize('RECEPTIONIST', 'DOCTOR', 'PATIENT'), async (req, res) => {
   try {
