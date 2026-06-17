@@ -1,180 +1,213 @@
 import { useEffect, useState } from 'react';
-import { CalendarPlus, Loader2, CheckCircle2, Clock, XCircle, ExternalLink, Hash, Printer } from 'lucide-react';
+import {
+  CalendarPlus, Loader2, CheckCircle2, Clock, XCircle,
+  Hash, Printer, ChevronDown, ChevronUp,
+} from 'lucide-react';
 import api from '../../api/axios';
 import TokenCardModal from '../../components/TokenCardModal';
 
+const THRESHOLD_MS = 48 * 60 * 60 * 1000;
+
 const TOKEN_STATUS = {
-  WAITING:   { label: 'Waiting',   cls: 'bg-amber-100 text-amber-700',   Icon: Clock },
-  SERVED:    { label: 'Served',    cls: 'bg-emerald-100 text-emerald-700', Icon: CheckCircle2 },
-  CANCELLED: { label: 'Cancelled', cls: 'bg-gray-100 text-gray-500',      Icon: XCircle },
+  WAITING:   { cls: 'bg-amber-100 text-amber-700',    Icon: Clock,          label: 'Waiting'   },
+  SERVED:    { cls: 'bg-emerald-100 text-emerald-700', Icon: CheckCircle2,  label: 'Served'    },
+  CANCELLED: { cls: 'bg-gray-100 text-gray-500',       Icon: XCircle,       label: 'Cancelled' },
 };
 
-function MyTokensSection({ viewToken }) {
-  const [tokens, setTokens] = useState([]);
-  const [loading, setLoading] = useState(true);
+const SOURCE = {
+  online: { cls: 'bg-teal-100 text-teal-700',  label: 'Online – Accepted' },
+  direct: { cls: 'bg-sky-100  text-sky-700',   label: 'Directly Issued'   },
+};
 
-  useEffect(() => {
-    api.get('/tokens/mine')
-      .then((res) => setTokens(res.data.data || []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+function fmt(dateStr) {
+  return new Date(dateStr).toLocaleDateString('en-BD', { day: 'numeric', month: 'short', year: 'numeric' });
+}
 
-  const today = new Date().toISOString().slice(0, 10);
-  const todayTokens = tokens.filter((t) => t.token_date?.slice(0, 10) === today);
-  const pastTokens  = tokens.filter((t) => t.token_date?.slice(0, 10) !== today);
-
-  if (loading) {
-    return (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-        <div className="flex items-center gap-2 text-sm text-gray-400 py-2">
-          <Loader2 size={16} className="animate-spin" /> Loading your tokens…
-        </div>
-      </div>
-    );
-  }
-
-  if (tokens.length === 0) return null;
-
+/* ── active issued-token card (clickable → modal) ─────────────────────── */
+function ActiveTokenCard({ token, source, onView }) {
+  const s   = TOKEN_STATUS[token.status] || TOKEN_STATUS.WAITING;
+  const src = SOURCE[source];
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
-      <div className="flex items-center gap-2">
-        <Hash size={18} className="text-teal-600" />
-        <h3 className="text-lg font-semibold text-gray-800">My Tokens</h3>
+    <button
+      onClick={onView}
+      className={`w-full flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-shadow hover:shadow-md ${
+        token.status === 'WAITING'
+          ? 'border-teal-200 bg-teal-50'
+          : 'border-emerald-100 bg-emerald-50/40'
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <span className={`text-3xl font-extrabold leading-none ${
+          token.status === 'WAITING' ? 'text-teal-600' : 'text-emerald-500'
+        }`}>
+          #{token.token_number}
+        </span>
+        <div>
+          <p className="text-sm font-semibold text-gray-800">{token.unit_name}</p>
+          {token.floor_location && (
+            <p className="text-xs text-gray-400">{token.floor_location}</p>
+          )}
+          <p className="text-xs text-gray-400">{fmt(token.token_date)}</p>
+        </div>
       </div>
+      <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${s.cls}`}>
+          <s.Icon size={11} /> {s.label}
+        </span>
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${src.cls}`}>
+          {src.label}
+        </span>
+        <span className="text-xs text-gray-400 flex items-center gap-1">
+          <Printer size={10} /> View Card
+        </span>
+      </div>
+    </button>
+  );
+}
 
-      {todayTokens.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Today</p>
-          {todayTokens.map((t) => {
-            const s = TOKEN_STATUS[t.status] || TOKEN_STATUS.WAITING;
-            return (
-              <div key={t.token_id} className={`flex items-center justify-between gap-3 rounded-xl px-4 py-3 border ${t.status === 'WAITING' ? 'border-amber-200 bg-amber-50' : 'border-gray-100 bg-gray-50'}`}>
-                <div className="flex items-center gap-3">
-                  <span className={`text-2xl font-bold ${t.status === 'WAITING' ? 'text-amber-600' : 'text-gray-400'}`}>#{t.token_number}</span>
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">{t.unit_name}</p>
-                    {t.floor_location && <p className="text-xs text-gray-400">{t.floor_location}</p>}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${s.cls}`}>
-                    <s.Icon size={11} /> {s.label}
-                  </span>
-                  <button
-                    onClick={() => viewToken(t.token_id)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:bg-white"
-                  >
-                    <Printer size={11} /> View
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+/* ── online-pending request card (no token yet) ───────────────────────── */
+function PendingRequestCard({ req }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+          <Clock size={18} className="text-amber-600" />
         </div>
-      )}
-
-      {pastTokens.length > 0 && (
-        <div className="space-y-1">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Past tokens</p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
-                  <th className="py-2 pr-4 font-medium">Token #</th>
-                  <th className="py-2 pr-4 font-medium">Unit</th>
-                  <th className="py-2 pr-4 font-medium">Date</th>
-                  <th className="py-2 pr-4 font-medium">Status</th>
-                  <th className="py-2 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {pastTokens.map((t) => {
-                  const s = TOKEN_STATUS[t.status] || TOKEN_STATUS.WAITING;
-                  return (
-                    <tr key={t.token_id} className="border-b border-gray-50 last:border-0">
-                      <td className="py-2 pr-4 font-semibold text-gray-700">#{t.token_number}</td>
-                      <td className="py-2 pr-4 text-gray-500 text-xs">{t.unit_name}</td>
-                      <td className="py-2 pr-4 text-gray-500 text-xs">
-                        {new Date(t.token_date).toLocaleDateString('en-BD', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </td>
-                      <td className="py-2 pr-4">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${s.cls}`}>
-                          <s.Icon size={11} /> {s.label}
-                        </span>
-                      </td>
-                      <td className="py-2">
-                        <button
-                          onClick={() => viewToken(t.token_id)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-500 hover:bg-gray-50"
-                        >
-                          <Printer size={11} /> View
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+        <div>
+          <p className="text-sm font-semibold text-gray-800">{req.unit_name}</p>
+          <p className="text-xs text-gray-500">Requested for {fmt(req.preferred_date)}</p>
+          {req.reason && (
+            <p className="text-xs text-gray-400 truncate max-w-[220px]">{req.reason}</p>
+          )}
         </div>
-      )}
+      </div>
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-200 text-amber-800 flex-shrink-0">
+        <Clock size={11} /> Online – Pending
+      </span>
     </div>
   );
 }
 
-function StatusBadge({ req }) {
-  if (req.status === 'PENDING') {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-        <Clock size={11} /> Pending Review
-      </span>
-    );
-  }
-  if (req.status === 'APPROVED') {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
-        <CheckCircle2 size={11} /> Approved — Token #{req.token_number}
-      </span>
-    );
-  }
+/* ── past token row (clickable) ────────────────────────────────────────── */
+function PastTokenRow({ token, source, onView }) {
+  const s   = TOKEN_STATUS[token.status] || TOKEN_STATUS.WAITING;
+  const src = SOURCE[source];
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
-      <XCircle size={11} /> Rejected
-    </span>
+    <tr className="border-b border-gray-50 last:border-0 hover:bg-gray-50 cursor-pointer" onClick={onView}>
+      <td className="py-2.5 pr-4 font-semibold text-gray-400 line-through">#{token.token_number}</td>
+      <td className="py-2.5 pr-4 text-gray-500 text-xs">{token.unit_name}</td>
+      <td className="py-2.5 pr-4 text-gray-400 text-xs">{fmt(token.token_date)}</td>
+      <td className="py-2.5 pr-4">
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${s.cls}`}>
+          <s.Icon size={11} /> {s.label}
+        </span>
+      </td>
+      <td className="py-2.5 pr-4">
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${src.cls}`}>
+          {src.label}
+        </span>
+      </td>
+      <td className="py-2.5">
+        <span className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-500 hover:bg-white">
+          <Printer size={11} /> View
+        </span>
+      </td>
+    </tr>
   );
 }
 
-export default function PatientTokenRequestsPage() {
-  const [units, setUnits] = useState([]);
-  const [requests, setRequests] = useState([]);
-  const [loadingReqs, setLoadingReqs] = useState(true);
-  const [form, setForm] = useState({ unit_id: '', preferred_date: '', reason: '' });
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState('');
-  const [toast, setToast] = useState('');
-  const [viewTokenId, setViewTokenId] = useState(null);
+/* ── rejected request row ─────────────────────────────────────────────── */
+function RejectedRequestRow({ req }) {
+  return (
+    <tr className="border-b border-gray-50 last:border-0">
+      <td className="py-2.5 pr-4 text-gray-300">—</td>
+      <td className="py-2.5 pr-4 text-gray-500 text-xs">{req.unit_name}</td>
+      <td className="py-2.5 pr-4 text-gray-400 text-xs">{fmt(req.preferred_date)}</td>
+      <td className="py-2.5 pr-4">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+          <XCircle size={11} /> Rejected
+        </span>
+      </td>
+      <td className="py-2.5 pr-4">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-500">
+          Online – Rejected
+        </span>
+      </td>
+      <td className="py-2.5 text-xs text-gray-400 max-w-[160px] truncate">
+        {req.reject_reason || '—'}
+      </td>
+    </tr>
+  );
+}
 
-  const today = new Date().toISOString().slice(0, 10);
-  const maxDate = new Date();
+/* ═══════════════════════════════════════════════════════════════════════ */
+export default function PatientTokenRequestsPage() {
+  const [myTokens,   setMyTokens]   = useState([]);
+  const [myRequests, setMyRequests] = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [units,      setUnits]      = useState([]);
+  const [form,       setForm]       = useState({ unit_id: '', preferred_date: '', reason: '' });
+  const [submitting, setSubmitting] = useState(false);
+  const [formError,  setFormError]  = useState('');
+  const [toast,      setToast]      = useState('');
+  const [viewTokenId, setViewTokenId] = useState(null);
+  const [pastOpen,   setPastOpen]   = useState(false);
+
+  const today      = new Date().toISOString().slice(0, 10);
+  const maxDate    = new Date();
   maxDate.setDate(maxDate.getDate() + 30);
   const maxDateStr = maxDate.toISOString().slice(0, 10);
 
-  const loadRequests = () => {
-    setLoadingReqs(true);
-    api
-      .get('/token-requests/my')
-      .then((res) => setRequests(res.data.data || []))
-      .catch(() => {})
-      .finally(() => setLoadingReqs(false));
+  const loadData = () => {
+    setLoading(true);
+    Promise.all([
+      api.get('/tokens/mine').catch(() => ({ data: { data: [] } })),
+      api.get('/token-requests/my').catch(() => ({ data: { data: [] } })),
+    ]).then(([tokRes, reqRes]) => {
+      setMyTokens(tokRes.data.data || []);
+      setMyRequests(reqRes.data.data || []);
+    }).finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    api.get('/units').then((res) => setUnits((res.data.data || []).filter((u) => u.is_active))).catch(() => {});
-    loadRequests();
+    api.get('/units')
+      .then((r) => setUnits((r.data.data || []).filter((u) => u.is_active)))
+      .catch(() => {});
+    loadData();
   }, []);
 
-  const handleChange = (field, value) => setForm((f) => ({ ...f, [field]: value }));
+  /* ── derive categorised views ────────────────────────────────────── */
+  const now = Date.now();
+
+  // token_ids that came from an approved online request
+  const requestedTokenIds = new Set(
+    myRequests
+      .filter((r) => r.status === 'APPROVED' && r.token_id)
+      .map((r) => Number(r.token_id))
+  );
+
+  const getSource = (tokenId) =>
+    requestedTokenIds.has(Number(tokenId)) ? 'online' : 'direct';
+
+  const pendingRequests  = myRequests.filter((r) => r.status === 'PENDING');
+  const rejectedRequests = myRequests.filter((r) => r.status === 'REJECTED');
+
+  const activeTokens = myTokens.filter(
+    (t) =>
+      t.status !== 'CANCELLED' &&
+      now - new Date(t.issue_datetime).getTime() < THRESHOLD_MS
+  );
+  const pastTokens = myTokens.filter(
+    (t) =>
+      t.status === 'CANCELLED' ||
+      now - new Date(t.issue_datetime).getTime() >= THRESHOLD_MS
+  );
+
+  const hasActive = pendingRequests.length > 0 || activeTokens.length > 0;
+  const hasPast   = rejectedRequests.length > 0 || pastTokens.length > 0;
+
+  /* ── form handlers ───────────────────────────────────────────────── */
+  const handleChange = (f, v) => setForm((p) => ({ ...p, [f]: v }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -182,14 +215,14 @@ export default function PatientTokenRequestsPage() {
     setFormError('');
     try {
       await api.post('/token-requests', {
-        unit_id: Number(form.unit_id),
+        unit_id:        Number(form.unit_id),
         preferred_date: form.preferred_date,
-        reason: form.reason || undefined,
+        reason:         form.reason || undefined,
       });
-      setToast('Your token request has been submitted successfully.');
+      setToast('Your token request has been submitted. The receptionist will review it shortly.');
       setForm({ unit_id: '', preferred_date: '', reason: '' });
-      loadRequests();
-      setTimeout(() => setToast(''), 5000);
+      loadData();
+      setTimeout(() => setToast(''), 6000);
     } catch (err) {
       setFormError(err.response?.data?.error || 'Unable to submit request.');
     } finally {
@@ -197,19 +230,57 @@ export default function PatientTokenRequestsPage() {
     }
   };
 
+  /* ── render ──────────────────────────────────────────────────────── */
   return (
     <div className="space-y-6">
-      {/* My issued tokens (all, any source) */}
-      <MyTokensSection viewToken={setViewTokenId} />
 
-      {/* Request form */}
+      {/* ══ MY TOKENS (active) ══════════════════════════════════════ */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Hash size={18} className="text-teal-600" />
+            <h3 className="text-lg font-semibold text-gray-800">My Tokens</h3>
+          </div>
+          <button onClick={loadData} className="text-xs text-sky-600 hover:underline">Refresh</button>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center gap-2 text-sm text-gray-400 py-2">
+            <Loader2 size={16} className="animate-spin" /> Loading…
+          </div>
+        ) : !hasActive ? (
+          <div className="text-center py-8">
+            <Hash size={28} className="text-gray-200 mx-auto mb-2" />
+            <p className="text-sm text-gray-400">No active tokens right now.</p>
+            <p className="text-xs text-gray-300 mt-1">Tokens appear here within 48 hours of being issued.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {/* Online-pending: request submitted, awaiting review */}
+            {pendingRequests.map((req) => (
+              <PendingRequestCard key={`req-${req.request_id}`} req={req} />
+            ))}
+            {/* Active issued tokens (within 48 h, not CANCELLED) */}
+            {activeTokens.map((t) => (
+              <ActiveTokenCard
+                key={`tok-${t.token_id}`}
+                token={t}
+                source={getSource(t.token_id)}
+                onView={() => setViewTokenId(t.token_id)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ══ REQUEST A TOKEN (form) ═══════════════════════════════════ */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
         <div className="flex items-center gap-2 mb-1">
           <CalendarPlus size={18} className="text-teal-600" />
           <h3 className="text-lg font-semibold text-gray-800">Request a Token Online</h3>
         </div>
         <p className="text-sm text-gray-400 mb-5">
-          Submit a request and the receptionist will review it. You'll receive a token number for your preferred date.
+          Submit a request and the receptionist will review it. You'll receive a token number once approved.
         </p>
 
         {toast && (
@@ -228,7 +299,9 @@ export default function PatientTokenRequestsPage() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Unit *</label>
             <select
-              required value={form.unit_id} onChange={(e) => handleChange('unit_id', e.target.value)}
+              required
+              value={form.unit_id}
+              onChange={(e) => handleChange('unit_id', e.target.value)}
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
             >
               <option value="">Select a unit…</option>
@@ -240,85 +313,95 @@ export default function PatientTokenRequestsPage() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Preferred date *</label>
             <input
-              type="date" required
-              min={today} max={maxDateStr}
-              value={form.preferred_date} onChange={(e) => handleChange('preferred_date', e.target.value)}
+              type="date"
+              required
+              min={today}
+              max={maxDateStr}
+              value={form.preferred_date}
+              onChange={(e) => handleChange('preferred_date', e.target.value)}
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">Reason</label>
             <textarea
-              rows={2} value={form.reason} onChange={(e) => handleChange('reason', e.target.value)}
+              rows={2}
+              value={form.reason}
+              onChange={(e) => handleChange('reason', e.target.value)}
               placeholder="Briefly describe your symptoms or reason…"
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
             />
           </div>
           <div className="md:col-span-2">
             <button
-              type="submit" disabled={submitting}
+              type="submit"
+              disabled={submitting}
               className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
             >
-              {submitting && <Loader2 size={14} className="animate-spin" />} Submit Request
+              {submitting && <Loader2 size={14} className="animate-spin" />}
+              Submit Request
             </button>
           </div>
         </form>
       </div>
 
-      {/* My requests */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">My Token Requests</h3>
+      {/* ══ PAST TOKENS & REQUESTS (collapsible) ════════════════════ */}
+      {hasPast && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+          <button
+            onClick={() => setPastOpen((v) => !v)}
+            className="w-full flex items-center justify-between px-6 py-4 text-left"
+          >
+            <span className="text-base font-semibold text-gray-800">
+              Past Tokens &amp; Requests
+              <span className="ml-2 text-sm font-normal text-gray-400">
+                ({rejectedRequests.length + pastTokens.length})
+              </span>
+            </span>
+            {pastOpen
+              ? <ChevronUp size={18} className="text-gray-400" />
+              : <ChevronDown size={18} className="text-gray-400" />}
+          </button>
 
-        {loadingReqs ? (
-          <div className="flex items-center gap-2 text-sm text-gray-400 py-4">
-            <Loader2 size={16} className="animate-spin" /> Loading…
-          </div>
-        ) : requests.length === 0 ? (
-          <p className="text-sm text-gray-400 py-2">No token requests yet.</p>
-        ) : (
-          <div className="space-y-3">
-            {requests.map((req) => (
-              <div
-                key={req.request_id}
-                className={`rounded-xl border px-4 py-3 ${
-                  req.status === 'APPROVED' ? 'border-emerald-100 bg-emerald-50/40' :
-                  req.status === 'REJECTED' ? 'border-red-100 bg-red-50/30' :
-                  'border-gray-100 bg-gray-50'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3 flex-wrap">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800">{req.unit_name}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {new Date(req.preferred_date).toLocaleDateString('en-BD', { day: 'numeric', month: 'long', year: 'numeric' })}
-                    </p>
-                    {req.reason && (
-                      <p className="text-xs text-gray-400 mt-1 truncate max-w-xs">{req.reason}</p>
-                    )}
-                    {req.status === 'REJECTED' && req.reject_reason && (
-                      <p className="text-xs text-red-500 mt-1">{req.reject_reason}</p>
-                    )}
-                  </div>
-                  <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                    <StatusBadge req={req} />
-                    {req.status === 'APPROVED' && req.token_id && (
-                      <button
-                        onClick={() => setViewTokenId(req.token_id)}
-                        className="inline-flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700 font-medium"
-                      >
-                        <ExternalLink size={11} /> View Token
-                      </button>
-                    )}
-                  </div>
+          {pastOpen && (
+            <div className="px-6 pb-6">
+              {rejectedRequests.length === 0 && pastTokens.length === 0 ? (
+                <p className="text-sm text-gray-400 py-2">Nothing here yet.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
+                        <th className="py-2 pr-4 font-medium">Token #</th>
+                        <th className="py-2 pr-4 font-medium">Unit</th>
+                        <th className="py-2 pr-4 font-medium">Date</th>
+                        <th className="py-2 pr-4 font-medium">Status</th>
+                        <th className="py-2 pr-4 font-medium">Source</th>
+                        <th className="py-2 font-medium"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* Rejected requests first */}
+                      {rejectedRequests.map((req) => (
+                        <RejectedRequestRow key={`rej-${req.request_id}`} req={req} />
+                      ))}
+                      {/* Past issued tokens (all clickable) */}
+                      {pastTokens.map((t) => (
+                        <PastTokenRow
+                          key={`past-${t.token_id}`}
+                          token={t}
+                          source={getSource(t.token_id)}
+                          onView={() => setViewTokenId(t.token_id)}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-                <p className="text-xs text-gray-300 mt-2">
-                  Submitted {new Date(req.created_at).toLocaleString('en-BD', { dateStyle: 'short', timeStyle: 'short' })}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {viewTokenId && (
         <TokenCardModal tokenId={viewTokenId} onClose={() => setViewTokenId(null)} />

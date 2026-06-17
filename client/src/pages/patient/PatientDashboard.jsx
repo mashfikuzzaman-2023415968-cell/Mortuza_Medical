@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Stethoscope, ClipboardList, FlaskConical, CreditCard, User, CheckCircle2, AlertCircle, XCircle, Hash } from 'lucide-react';
+import { Stethoscope, ClipboardList, FlaskConical, CreditCard, User, CheckCircle2, AlertCircle, XCircle, Hash, Clock, Printer } from 'lucide-react';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import { usePatientPhoto } from '../../hooks/usePatientPhoto';
@@ -43,6 +43,7 @@ export default function PatientDashboard({ onNavChange }) {
   const [counts, setCounts] = useState({ visits: null, prescriptions: null, tests: null });
   const [loading, setLoading] = useState(true);
   const [todayTokens, setTodayTokens] = useState([]);
+  const [requestedTokenIds, setRequestedTokenIds] = useState(new Set());
   const [viewTokenId, setViewTokenId] = useState(null);
 
   useEffect(() => {
@@ -54,7 +55,8 @@ export default function PatientDashboard({ onNavChange }) {
       api.get('/prescriptions', { params: { patient: 'me' } }).catch(() => ({ data: { data: [] } })),
       api.get('/test-orders', { params: { patient: 'me' } }).catch(() => ({ data: { data: [] } })),
       api.get('/tokens/mine').catch(() => ({ data: { data: [] } })),
-    ]).then(([profileRes, cardRes, visitsRes, rxRes, testsRes, tokensRes]) => {
+      api.get('/token-requests/my').catch(() => ({ data: { data: [] } })),
+    ]).then(([profileRes, cardRes, visitsRes, rxRes, testsRes, tokensRes, reqsRes]) => {
       setProfile(profileRes.data.data);
       setCard(cardRes.data.data);
       setCounts({
@@ -64,6 +66,13 @@ export default function PatientDashboard({ onNavChange }) {
       });
       setTodayTokens(
         (tokensRes.data.data || []).filter((t) => t.token_date?.slice(0, 10) === today)
+      );
+      setRequestedTokenIds(
+        new Set(
+          (reqsRes.data.data || [])
+            .filter((r) => r.status === 'APPROVED' && r.token_id)
+            .map((r) => Number(r.token_id))
+        )
       );
     }).finally(() => setLoading(false));
   }, []);
@@ -157,43 +166,61 @@ export default function PatientDashboard({ onNavChange }) {
             <h3 className="text-sm font-semibold text-gray-800">Today's Token{todayTokens.length > 1 ? 's' : ''}</h3>
           </div>
           <div className="space-y-2">
-            {todayTokens.map((t) => (
-              <button
-                key={t.token_id}
-                onClick={() => setViewTokenId(t.token_id)}
-                className={`w-full flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-left border transition-shadow hover:shadow-md ${
-                  t.status === 'WAITING' ? 'border-teal-200 bg-teal-50' : 'border-gray-100 bg-gray-50'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <span className={`text-3xl font-extrabold ${t.status === 'WAITING' ? 'text-teal-600' : 'text-gray-300 line-through'}`}>
-                    #{t.token_number}
-                  </span>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">{t.unit_name}</p>
-                    {t.floor_location && <p className="text-xs text-gray-400">{t.floor_location}</p>}
+            {todayTokens.map((t) => {
+              const isOnline = requestedTokenIds.has(Number(t.token_id));
+              return (
+                <button
+                  key={t.token_id}
+                  onClick={() => setViewTokenId(t.token_id)}
+                  className={`w-full flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-left border transition-shadow hover:shadow-md ${
+                    t.status === 'WAITING'
+                      ? 'border-teal-200 bg-teal-50'
+                      : t.status === 'SERVED'
+                        ? 'border-emerald-100 bg-emerald-50/40'
+                        : 'border-gray-100 bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className={`text-3xl font-extrabold leading-none ${
+                      t.status === 'WAITING' ? 'text-teal-600'
+                      : t.status === 'SERVED' ? 'text-emerald-500'
+                      : 'text-gray-300 line-through'
+                    }`}>
+                      #{t.token_number}
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">{t.unit_name}</p>
+                      {t.floor_location && <p className="text-xs text-gray-400">{t.floor_location}</p>}
+                    </div>
                   </div>
-                </div>
-                <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                  {t.status === 'WAITING' && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-                      <Hash size={10} /> Waiting
+                  <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                    {t.status === 'WAITING' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                        <Clock size={10} /> Waiting
+                      </span>
+                    )}
+                    {t.status === 'SERVED' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                        <CheckCircle2 size={10} /> Served
+                      </span>
+                    )}
+                    {t.status === 'CANCELLED' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+                        <XCircle size={10} /> Cancelled
+                      </span>
+                    )}
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                      isOnline ? 'bg-teal-100 text-teal-700' : 'bg-sky-100 text-sky-700'
+                    }`}>
+                      {isOnline ? 'Online – Accepted' : 'Directly Issued'}
                     </span>
-                  )}
-                  {t.status === 'SERVED' && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
-                      <CheckCircle2 size={10} /> Served
+                    <span className="text-xs text-gray-400 flex items-center gap-1">
+                      <Printer size={10} /> View Card
                     </span>
-                  )}
-                  {t.status === 'CANCELLED' && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
-                      <XCircle size={10} /> Cancelled
-                    </span>
-                  )}
-                  <span className="text-xs text-gray-400">Tap to view</span>
-                </div>
-              </button>
-            ))}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
