@@ -30,6 +30,7 @@ import PatientVisitsPage from './patient/PatientVisitsPage';
 import PatientPrescriptionsPage from './patient/PatientPrescriptionsPage';
 import PatientTestResultsPage from './patient/PatientTestResultsPage';
 import PatientHealthCardPage from './patient/PatientHealthCardPage';
+import HealthAnalyticsPage from './patient/HealthAnalyticsPage';
 import PatientUnitsPage from './patient/PatientUnitsPage';
 import PatientDoctorsPage from './patient/PatientDoctorsPage';
 import AdminDashboard from './admin/AdminDashboard';
@@ -309,6 +310,8 @@ export default function DashboardHome() {
         <PatientPrescriptionsPage />
       ) : nav === 'tests' && user.role === 'PATIENT' ? (
         <PatientTestResultsPage />
+      ) : nav === 'analytics' && user.role === 'PATIENT' ? (
+        <HealthAnalyticsPage />
       ) : nav === 'card' && user.role === 'PATIENT' ? (
         <PatientHealthCardPage />
       ) : nav === 'units' && user.role === 'PATIENT' ? (
