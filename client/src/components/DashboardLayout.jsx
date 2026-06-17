@@ -3,7 +3,7 @@ import { Menu, LogOut, HeartPulse, Sun, Moon } from 'lucide-react';
 import { NAV, ROLES, ROLE_LABEL } from '../config/roles';
 import { useTheme } from '../context/ThemeContext';
 
-export default function DashboardLayout({ role, username, nav, onNavChange, onLogout, children }) {
+export default function DashboardLayout({ role, username, nav, onNavChange, onLogout, navBadges = {}, children }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { dark, toggle } = useTheme();
   const navItems = NAV[role] || [];
@@ -36,8 +36,13 @@ export default function DashboardLayout({ role, username, nav, onNavChange, onLo
                   : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
-              <item.i size={16} />
-              {item.l}
+              <item.i size={16} className="flex-shrink-0" />
+              <span className="flex-1 text-left">{item.l}</span>
+              {navBadges[item.k] > 0 && (
+                <span className="bg-amber-500 text-white text-xs font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center leading-none">
+                  {navBadges[item.k]}
+                </span>
+              )}
             </button>
           ))}
         </nav>

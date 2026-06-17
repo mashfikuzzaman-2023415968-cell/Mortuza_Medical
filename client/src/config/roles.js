@@ -2,6 +2,7 @@ import {
   Shield, CreditCard, Stethoscope, Pill, FlaskConical, User,
   BarChart3, Users, Hash, Calendar, Ambulance, ClipboardList,
   Clock, BedDouble, AlertTriangle, FileText, HeartPulse, UserCheck, Building2,
+  Inbox, CalendarPlus,
 } from 'lucide-react';
 
 export const ROLES = [
@@ -29,6 +30,7 @@ export const NAV = {
     { k: 'patients', l: 'Patients', i: Users },
     { k: 'cards', l: 'Health cards', i: CreditCard },
     { k: 'tokens', l: 'Token queue', i: Hash },
+    { k: 'treqs', l: 'Token Requests', i: Inbox },
     { k: 'units', l: 'Units', i: Building2 },
     { k: 'doctors', l: 'Doctors', i: Stethoscope },
     { k: 'ambulance', l: 'Ambulance', i: Ambulance },
@@ -58,6 +60,7 @@ export const NAV = {
     { k: 'rx', l: 'Prescriptions', i: ClipboardList },
     { k: 'tests', l: 'Test results', i: FlaskConical },
     { k: 'card', l: 'Health card', i: CreditCard },
+    { k: 'treqs', l: 'Request Token', i: CalendarPlus },
     { k: 'units', l: 'Units', i: Building2 },
     { k: 'doctors', l: 'Doctors', i: Stethoscope },
   ],

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Users, Stethoscope, BedDouble, Ambulance, DollarSign, Clock, UserCheck, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
+import { Users, Stethoscope, BedDouble, Ambulance, DollarSign, Clock, UserCheck, AlertCircle, CheckCircle2, XCircle, Inbox } from 'lucide-react';
 import api from '../../api/axios';
 
 function StatCard({ icon: Icon, label, value, sub, color, onClick }) {
@@ -31,17 +31,20 @@ export default function AdminDashboard({ onNavChange }) {
   const [ambulances, setAmbulances] = useState([]);
   const [workload, setWorkload] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [pendingTokenReqs, setPendingTokenReqs] = useState(null);
 
   useEffect(() => {
     Promise.all([
       api.get('/reports/summary'),
       api.get('/ambulances'),
       api.get('/reports/workload'),
+      api.get('/token-requests/pending'),
     ])
-      .then(([sumRes, ambRes, wlRes]) => {
+      .then(([sumRes, ambRes, wlRes, trRes]) => {
         setData(sumRes.data.data);
         setAmbulances(ambRes.data.data || []);
         setWorkload((wlRes.data.data || []).filter((d) => d.visits > 0).slice(0, 5));
+        setPendingTokenReqs((trRes.data.data || []).length);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -59,6 +62,7 @@ export default function AdminDashboard({ onNavChange }) {
         <StatCard icon={BedDouble} label="Beds occupied" value={loading ? '…' : data ? `${data.beds_occupied}/${data.beds_occupied + data.beds_free}` : '—'} sub={loading ? '' : data ? `${data.beds_free} free` : ''} color="bg-amber-100 text-amber-600" onClick={() => onNavChange('reports')} />
         <StatCard icon={Ambulance} label="Ambulances free" value={val('free_ambulances')} color="bg-rose-100 text-rose-600" onClick={() => onNavChange('ambulance')} />
         <StatCard icon={UserCheck} label="Pending approvals" value={val('pending_approvals')} color="bg-orange-100 text-orange-600" onClick={() => onNavChange('pending')} />
+        <StatCard icon={Inbox} label="Pending token requests" value={loading ? '…' : (pendingTokenReqs ?? '—')} color="bg-teal-100 text-teal-600" onClick={() => {}} />
       </div>
 
       {/* Ambulance status widget */}

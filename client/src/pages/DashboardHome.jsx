@@ -39,6 +39,8 @@ import RosterPage from './admin/RosterPage';
 import AmbulancePage from './admin/AmbulancePage';
 import ReportsPage from './admin/ReportsPage';
 import AdminUsersPage from './admin/AdminUsersPage';
+import ReceptionTokenRequestsPage from './receptionist/TokenRequestsPage';
+import PatientTokenRequestsPage from './patient/TokenRequestsPage';
 
 const ROLE_WELCOME = {
   ADMIN: {
@@ -200,6 +202,15 @@ export default function DashboardHome() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [nav, setNav] = useState('dash');
+  const [pendingTokenReqCount, setPendingTokenReqCount] = useState(0);
+
+  useEffect(() => {
+    if (user.role === 'RECEPTIONIST') {
+      api.get('/token-requests/pending')
+        .then((res) => setPendingTokenReqCount((res.data.data || []).length))
+        .catch(() => {});
+    }
+  }, [user.role]);
 
   const handleLogout = () => {
     logout();
@@ -210,7 +221,7 @@ export default function DashboardHome() {
   const current = navItems.find((n) => n.k === nav);
 
   return (
-    <DashboardLayout role={user.role} username={user.username} nav={nav} onNavChange={setNav} onLogout={handleLogout}>
+    <DashboardLayout role={user.role} username={user.username} nav={nav} onNavChange={setNav} onLogout={handleLogout} navBadges={user.role === 'RECEPTIONIST' ? { treqs: pendingTokenReqCount } : {}}>
       {nav === 'dash' ? (
         <div className="space-y-6">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
@@ -304,6 +315,10 @@ export default function DashboardHome() {
         <PatientUnitsPage />
       ) : nav === 'doctors' && user.role === 'PATIENT' ? (
         <PatientDoctorsPage />
+      ) : nav === 'treqs' && user.role === 'RECEPTIONIST' ? (
+        <ReceptionTokenRequestsPage />
+      ) : nav === 'treqs' && user.role === 'PATIENT' ? (
+        <PatientTokenRequestsPage />
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <h3 className="text-lg font-semibold text-gray-800">{current?.l}</h3>

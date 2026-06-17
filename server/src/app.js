@@ -19,6 +19,7 @@ const dispenseRoutes = require('./routes/dispense');
 const doctorsRoutes = require('./routes/doctors');
 const ambulanceRoutes = require('./routes/ambulance');
 const reportsRoutes = require('./routes/reports');
+const tokenRequestsRoutes = require('./routes/token-requests');
 
 const app = express();
 app.use(cors());
@@ -42,6 +43,7 @@ app.use('/api/dispense', dispenseRoutes);
 app.use('/api/doctors', doctorsRoutes);
 app.use('/api/ambulances', ambulanceRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/token-requests', tokenRequestsRoutes);
 
 app.get('/api/health', async (req, res) => {
   try {

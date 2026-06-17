@@ -344,3 +344,14 @@ SELECT setval('ward_admission_admission_id_seq',(SELECT MAX(admission_id) FROM w
 SELECT setval('ambulance_ambulance_id_seq',   (SELECT MAX(ambulance_id) FROM ambulance));
 SELECT setval('ambulance_dispatch_dispatch_id_seq',(SELECT MAX(dispatch_id) FROM ambulance_dispatch));
 SELECT setval('app_user_user_id_seq',         (SELECT MAX(user_id) FROM app_user));
+
+-- ---------- token_request ----------
+INSERT INTO token_request (request_id, patient_id, unit_id, preferred_date, reason, status, reject_reason, created_at, reviewed_by, reviewed_at, token_id) VALUES
+ (1, 1, 1, '2026-01-04', 'Fever and headache for 3 days', 'APPROVED', NULL, '2026-01-03 20:00', 4, '2026-01-04 07:50', 1),
+ (2, 4, 2, '2026-01-04', 'Recurring migraine', 'APPROVED', NULL, '2026-01-03 21:00', 4, '2026-01-04 07:55', 4),
+ (3, 5, 1, '2026-01-05', 'Body ache and weakness', 'APPROVED', NULL, '2026-01-04 19:00', 4, '2026-01-05 07:45', 6),
+ (4, 10, 1, '2026-01-10', 'Routine checkup', 'REJECTED', 'Health card expired. Please renew at reception.', '2026-01-09 18:00', 4, '2026-01-09 19:00', NULL),
+ (5, 3, 3, '2026-01-12', 'Toothache lower molar', 'PENDING', NULL, '2026-01-11 22:00', NULL, NULL, NULL),
+ (6, 2, 4, '2026-01-12', 'Red itchy eyes for 2 days', 'PENDING', NULL, '2026-01-11 23:30', NULL, NULL, NULL);
+
+SELECT setval('token_request_request_id_seq', (SELECT MAX(request_id) FROM token_request));

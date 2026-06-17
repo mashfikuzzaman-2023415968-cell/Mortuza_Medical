@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Hash, Loader2, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { Hash, Loader2, CheckCircle2, XCircle, Clock, Printer } from 'lucide-react';
 import api from '../../api/axios';
 import PatientPicker from '../../components/PatientPicker';
+import TokenCardModal from '../../components/TokenCardModal';
 
 const STATUS_STYLES = {
   WAITING: 'bg-amber-100 text-amber-700',
@@ -29,6 +30,7 @@ export default function TokensPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const [filterUnit, setFilterUnit] = useState('');
+  const [viewTokenId, setViewTokenId] = useState(null);
 
   const loadTokens = (unit = filterUnit) => {
     setLoading(true);
@@ -57,9 +59,11 @@ export default function TokensPage() {
     try {
       const res = await api.post('/tokens', { patient_id: Number(patientId), unit_id: Number(unitId) });
       const t = res.data.data;
-      setFormSuccess(`Issued token #${t.token_number} for ${t.patient_name} (${t.unit_name}).`);
+      setFormSuccess(`Token #${t.token_number} issued for ${t.patient_name} (${t.unit_name}).`);
       setPatientId('');
       loadTokens();
+      // Auto-open the printable card
+      setViewTokenId(t.token_id);
     } catch (err) {
       setFormError(err.response?.data?.error || 'Unable to issue token.');
     } finally {
@@ -81,7 +85,19 @@ export default function TokensPage() {
         </div>
 
         {formError && <p className="text-sm text-red-600 mb-3">{formError}</p>}
-        {formSuccess && <p className="text-sm text-emerald-600 mb-3">{formSuccess}</p>}
+        {formSuccess && (
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2">
+            <p className="text-sm text-emerald-700">{formSuccess}</p>
+            {viewTokenId && (
+              <button
+                onClick={() => setViewTokenId(viewTokenId)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 flex-shrink-0"
+              >
+                <Printer size={12} /> Print Token
+              </button>
+            )}
+          </div>
+        )}
 
         <form onSubmit={handleIssue} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
           <div className="md:col-span-2">
@@ -140,6 +156,7 @@ export default function TokensPage() {
                   <th className="py-2 pr-4 font-medium">Card #</th>
                   <th className="py-2 pr-4 font-medium">Issued at</th>
                   <th className="py-2 pr-4 font-medium">Status</th>
+                  <th className="py-2 pr-4 font-medium"></th>
                 </tr>
               </thead>
               <tbody>
@@ -157,6 +174,15 @@ export default function TokensPage() {
                           <Icon size={12} /> {t.status}
                         </span>
                       </td>
+                      <td className="py-2.5 pr-4">
+                        <button
+                          onClick={() => setViewTokenId(t.token_id)}
+                          title="View / Print token card"
+                          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                        >
+                          <Printer size={12} /> Print
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -165,6 +191,10 @@ export default function TokensPage() {
           </div>
         )}
       </div>
+
+      {viewTokenId && (
+        <TokenCardModal tokenId={viewTokenId} onClose={() => setViewTokenId(null)} />
+      )}
     </div>
   );
 }

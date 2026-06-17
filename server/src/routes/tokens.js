@@ -109,4 +109,39 @@ router.post('/', verifyToken, authorize('RECEPTIONIST'), async (req, res) => {
   }
 });
 
+// GET /api/tokens/:id/details — full details for the printable card
+router.get('/:id/details', verifyToken, authorize('RECEPTIONIST', 'DOCTOR', 'PATIENT'), async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT t.token_id, t.token_number, t.token_date, t.status,
+              t.issue_datetime, t.unit_id,
+              u.unit_name, u.floor_location,
+              hc.card_number, hc.patient_id,
+              p.full_name AS patient_name, p.patient_category,
+              p.university_id, p.academic_dept
+       FROM token t
+       JOIN health_card hc ON t.health_card_id = hc.card_id
+       JOIN patient p ON hc.patient_id = p.patient_id
+       JOIN unit u ON t.unit_id = u.unit_id
+       WHERE t.token_id = $1`,
+      [req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Token not found' });
+    }
+
+    const token = result.rows[0];
+
+    if (req.user.role === 'PATIENT' && Number(token.patient_id) !== Number(req.user.patient_id)) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+
+    return res.json({ success: true, data: token });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
 module.exports = router;

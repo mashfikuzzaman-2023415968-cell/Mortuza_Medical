@@ -1,5 +1,5 @@
 -- MMCMS schema (PostgreSQL)
-DROP TABLE IF EXISTS app_user, ambulance_dispatch, ambulance, ward_admission, bed,
+DROP TABLE IF EXISTS token_request, app_user, ambulance_dispatch, ambulance, ward_admission, bed,
   test_order, diagnostic_test, medicine_dispense, prescription_item, medicine,
   prescription, visit, token, duty_roster, shift, health_card, patient, doctor, unit CASCADE;
 
@@ -239,4 +239,19 @@ CREATE TABLE app_user (
   email_verified     BOOLEAN NOT NULL DEFAULT FALSE,
   is_active          BOOLEAN DEFAULT TRUE,
   created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE token_request (
+  request_id     SERIAL PRIMARY KEY,
+  patient_id     INT NOT NULL REFERENCES patient(patient_id),
+  unit_id        INT NOT NULL REFERENCES unit(unit_id),
+  preferred_date DATE NOT NULL,
+  reason         TEXT,
+  status         VARCHAR(12) NOT NULL DEFAULT 'PENDING'
+                 CHECK (status IN ('PENDING','APPROVED','REJECTED')),
+  reject_reason  TEXT,
+  created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reviewed_by    INT REFERENCES app_user(user_id),
+  reviewed_at    TIMESTAMP,
+  token_id       INT REFERENCES token(token_id)
 );
