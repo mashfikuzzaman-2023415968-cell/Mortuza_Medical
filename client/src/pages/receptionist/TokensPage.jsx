@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Hash, Loader2, CheckCircle2, XCircle, Clock, Printer } from 'lucide-react';
+import { Hash, Loader2, CheckCircle2, XCircle, Clock, Printer, ChevronDown, ChevronUp } from 'lucide-react';
 import api from '../../api/axios';
 import PatientPicker from '../../components/PatientPicker';
 import TokenCardModal from '../../components/TokenCardModal';
+
+const THRESHOLD_MS = 48 * 60 * 60 * 1000;
 
 const STATUS_STYLES = {
   WAITING: 'bg-amber-100 text-amber-700',
@@ -15,6 +17,62 @@ const STATUS_ICONS = {
   SERVED: CheckCircle2,
   CANCELLED: XCircle,
 };
+
+function fmtDate(d) {
+  return new Date(d).toLocaleDateString('en-BD', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function StatusBadge({ status }) {
+  const Icon = STATUS_ICONS[status] || Clock;
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[status]}`}>
+      <Icon size={12} /> {status}
+    </span>
+  );
+}
+
+function TokenTable({ rows, showDate, onView }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
+            <th className="py-2 pr-4 font-medium">Token #</th>
+            <th className="py-2 pr-4 font-medium">Unit</th>
+            <th className="py-2 pr-4 font-medium">Patient</th>
+            <th className="py-2 pr-4 font-medium">Card #</th>
+            {showDate && <th className="py-2 pr-4 font-medium">Date</th>}
+            <th className="py-2 pr-4 font-medium">Issued at</th>
+            <th className="py-2 pr-4 font-medium">Status</th>
+            <th className="py-2 pr-4 font-medium"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((t) => (
+            <tr key={t.token_id} className="border-b border-gray-50 last:border-0">
+              <td className="py-2.5 pr-4 font-semibold text-gray-700">#{t.token_number}</td>
+              <td className="py-2.5 pr-4 text-gray-500">{t.unit_name}</td>
+              <td className="py-2.5 pr-4 text-gray-500">{t.patient_name}</td>
+              <td className="py-2.5 pr-4 text-gray-500">{t.card_number}</td>
+              {showDate && <td className="py-2.5 pr-4 text-gray-500 text-xs">{fmtDate(t.token_date)}</td>}
+              <td className="py-2.5 pr-4 text-gray-500">{new Date(t.issue_datetime).toLocaleTimeString()}</td>
+              <td className="py-2.5 pr-4"><StatusBadge status={t.status} /></td>
+              <td className="py-2.5 pr-4">
+                <button
+                  onClick={() => onView(t.token_id)}
+                  title="View / Print token card"
+                  className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                >
+                  <Printer size={12} /> Print
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 export default function TokensPage() {
   const [tokens, setTokens] = useState([]);
@@ -30,12 +88,17 @@ export default function TokensPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const [filterUnit, setFilterUnit] = useState('');
+  const [scope, setScope] = useState('today'); // 'today' | 'all'
+  const [pastOpen, setPastOpen] = useState(false);
   const [viewTokenId, setViewTokenId] = useState(null);
 
-  const loadTokens = (unit = filterUnit) => {
+  const loadTokens = (unit = filterUnit, sc = scope) => {
     setLoading(true);
+    const params = {};
+    if (unit) params.unit_id = unit;
+    if (sc === 'all') params.scope = 'all';
     api
-      .get('/tokens', { params: unit ? { unit_id: unit } : {} })
+      .get('/tokens', { params })
       .then((res) => setTokens(res.data.data || []))
       .catch(() => setError('Unable to load tokens.'))
       .finally(() => setLoading(false));
@@ -62,7 +125,6 @@ export default function TokensPage() {
       setFormSuccess(`Token #${t.token_number} issued for ${t.patient_name} (${t.unit_name}).`);
       setPatientId('');
       loadTokens();
-      // Auto-open the printable card
       setViewTokenId(t.token_id);
     } catch (err) {
       setFormError(err.response?.data?.error || 'Unable to issue token.');
@@ -73,11 +135,26 @@ export default function TokensPage() {
 
   const handleFilterChange = (value) => {
     setFilterUnit(value);
-    loadTokens(value);
+    loadTokens(value, scope);
   };
+
+  const handleScopeChange = (sc) => {
+    setScope(sc);
+    loadTokens(filterUnit, sc);
+  };
+
+  // Split into active (WAITING within 48h) and past (everything else).
+  const now = Date.now();
+  const activeTokens = tokens.filter(
+    (t) => t.status === 'WAITING' && now - new Date(t.issue_datetime).getTime() < THRESHOLD_MS
+  );
+  const pastTokens = tokens.filter(
+    (t) => t.status !== 'WAITING' || now - new Date(t.issue_datetime).getTime() >= THRESHOLD_MS
+  );
 
   return (
     <div className="space-y-4">
+      {/* Issue token */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
         <div className="flex items-center gap-2 mb-4">
           <Hash size={18} className="text-sky-600" />
@@ -123,74 +200,87 @@ export default function TokensPage() {
         </form>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-800">Today's Token Queue</h3>
-          <select
-            value={filterUnit} onChange={(e) => handleFilterChange(e.target.value)}
-            className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+      {/* Filters */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center justify-between gap-3 flex-wrap">
+        <div className="inline-flex rounded-lg border border-gray-200 p-0.5">
+          <button
+            onClick={() => handleScopeChange('today')}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium ${scope === 'today' ? 'bg-sky-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
           >
-            <option value="">All units</option>
-            {units.map((u) => (
-              <option key={u.unit_id} value={u.unit_id}>{u.unit_name}</option>
-            ))}
-          </select>
+            Today
+          </button>
+          <button
+            onClick={() => handleScopeChange('all')}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium ${scope === 'all' ? 'bg-sky-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+          >
+            All history
+          </button>
         </div>
+        <select
+          value={filterUnit} onChange={(e) => handleFilterChange(e.target.value)}
+          className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+        >
+          <option value="">All units</option>
+          {units.map((u) => (
+            <option key={u.unit_id} value={u.unit_id}>{u.unit_name}</option>
+          ))}
+        </select>
+      </div>
 
-        {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
-        {loading ? (
+      {loading ? (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <div className="flex items-center gap-2 text-sm text-gray-400 py-4">
             <Loader2 size={16} className="animate-spin" /> Loading…
           </div>
-        ) : tokens.length === 0 ? (
-          <p className="text-sm text-gray-400 py-2">No tokens issued today.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
-                  <th className="py-2 pr-4 font-medium">Token #</th>
-                  <th className="py-2 pr-4 font-medium">Unit</th>
-                  <th className="py-2 pr-4 font-medium">Patient</th>
-                  <th className="py-2 pr-4 font-medium">Card #</th>
-                  <th className="py-2 pr-4 font-medium">Issued at</th>
-                  <th className="py-2 pr-4 font-medium">Status</th>
-                  <th className="py-2 pr-4 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {tokens.map((t) => {
-                  const Icon = STATUS_ICONS[t.status] || Clock;
-                  return (
-                    <tr key={t.token_id} className="border-b border-gray-50 last:border-0">
-                      <td className="py-2.5 pr-4 font-semibold text-gray-700">#{t.token_number}</td>
-                      <td className="py-2.5 pr-4 text-gray-500">{t.unit_name}</td>
-                      <td className="py-2.5 pr-4 text-gray-500">{t.patient_name}</td>
-                      <td className="py-2.5 pr-4 text-gray-500">{t.card_number}</td>
-                      <td className="py-2.5 pr-4 text-gray-500">{new Date(t.issue_datetime).toLocaleTimeString()}</td>
-                      <td className="py-2.5 pr-4">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[t.status]}`}>
-                          <Icon size={12} /> {t.status}
-                        </span>
-                      </td>
-                      <td className="py-2.5 pr-4">
-                        <button
-                          onClick={() => setViewTokenId(t.token_id)}
-                          title="View / Print token card"
-                          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-700"
-                        >
-                          <Printer size={12} /> Print
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        </div>
+      ) : (
+        <>
+          {/* Active tokens */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Clock size={18} className="text-amber-500" />
+              <h3 className="text-lg font-semibold text-gray-800">Active Tokens</h3>
+              {activeTokens.length > 0 && (
+                <span className="bg-amber-500 text-white text-xs font-bold rounded-full px-2 py-0.5 min-w-[22px] text-center">
+                  {activeTokens.length}
+                </span>
+              )}
+            </div>
+            {activeTokens.length === 0 ? (
+              <p className="text-sm text-gray-400 py-2">No active tokens — none waiting in the queue.</p>
+            ) : (
+              <TokenTable rows={activeTokens} showDate={scope === 'all'} onView={setViewTokenId} />
+            )}
           </div>
-        )}
-      </div>
+
+          {/* Past tokens (collapsible) */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+            <button
+              onClick={() => setPastOpen((v) => !v)}
+              className="w-full flex items-center justify-between px-6 py-4 text-left"
+            >
+              <span className="text-base font-semibold text-gray-800">
+                Past Tokens
+                <span className="ml-2 text-sm font-normal text-gray-400">({pastTokens.length})</span>
+              </span>
+              {pastOpen ? <ChevronUp size={18} className="text-gray-400" /> : <ChevronDown size={18} className="text-gray-400" />}
+            </button>
+            {pastOpen && (
+              <div className="px-6 pb-6">
+                {pastTokens.length === 0 ? (
+                  <p className="text-sm text-gray-400 py-2">
+                    No past tokens {scope === 'today' ? 'today' : 'on record'}.
+                  </p>
+                ) : (
+                  <TokenTable rows={pastTokens} showDate={scope === 'all'} onView={setViewTokenId} />
+                )}
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {viewTokenId && (
         <TokenCardModal tokenId={viewTokenId} onClose={() => setViewTokenId(null)} />

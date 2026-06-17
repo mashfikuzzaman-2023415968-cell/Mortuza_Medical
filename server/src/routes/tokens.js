@@ -4,17 +4,20 @@ const { verifyToken, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
-// GET /api/tokens?date=&unit_id= - list tokens with patient + unit info
+// GET /api/tokens?date=&unit_id=&scope= - list tokens with patient + unit info
+// Default scope is today only. Pass scope=all for full token history (most
+// recent first, capped) — used by the receptionist history view.
 router.get('/', verifyToken, authorize('RECEPTIONIST', 'DOCTOR'), async (req, res) => {
   try {
-    const { date, unit_id } = req.query;
+    const { date, unit_id, scope } = req.query;
+    const allScope = scope === 'all';
     const conditions = [];
     const params = [];
 
     if (date) {
       conditions.push(`t.token_date = $${params.length + 1}`);
       params.push(date);
-    } else {
+    } else if (!allScope) {
       conditions.push(`t.token_date = CURRENT_DATE`);
     }
 
@@ -23,17 +26,24 @@ router.get('/', verifyToken, authorize('RECEPTIONIST', 'DOCTOR'), async (req, re
       params.push(unit_id);
     }
 
-    const where = `WHERE ${conditions.join(' AND ')}`;
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    // History view sorts newest-first; the daily queue sorts by unit + number.
+    const orderBy = allScope
+      ? 'ORDER BY t.token_date DESC, t.issue_datetime DESC'
+      : 'ORDER BY u.unit_name, t.token_number';
+    const limit = allScope ? 'LIMIT 500' : '';
+
     const result = await pool.query(
       `SELECT t.token_id, t.token_number, t.health_card_id, t.unit_id, t.issue_datetime,
-              t.token_date, t.status, u.unit_name, p.patient_id, p.full_name AS patient_name,
-              hc.card_number
+              t.token_date, t.status, u.unit_name, u.floor_location, p.patient_id,
+              p.full_name AS patient_name, hc.card_number
        FROM token t
        JOIN unit u ON u.unit_id = t.unit_id
        JOIN health_card hc ON hc.card_id = t.health_card_id
        JOIN patient p ON p.patient_id = hc.patient_id
        ${where}
-       ORDER BY u.unit_name, t.token_number`,
+       ${orderBy}
+       ${limit}`,
       params
     );
     return res.json({ success: true, data: result.rows, count: result.rows.length });
