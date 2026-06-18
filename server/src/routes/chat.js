@@ -4,8 +4,9 @@ const { verifyToken, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
+// gemini-2.0-flash has no free-tier quota on the provisioned key; 2.5-flash does.
 const GEMINI_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 function fmtDate(d) {
   if (!d) return null;
@@ -237,16 +238,25 @@ router.post('/', verifyToken, authorize('PATIENT'), async (req, res) => {
         .slice(-20)
     : [];
 
+  const requestBody = JSON.stringify({
+    system_instruction: { parts: [{ text: systemPrompt }] },
+    contents: [...safeHistory, { role: 'user', parts: [{ text: message }] }],
+    generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
+  });
+
   try {
-    const response = await fetch(`${GEMINI_URL}?key=${process.env.GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: systemPrompt }] },
-        contents: [...safeHistory, { role: 'user', parts: [{ text: message }] }],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
-      }),
-    });
+    // Gemini occasionally returns 503 (overloaded) / 429 (rate limit); retry a
+    // couple of times with backoff before falling back to the friendly error.
+    let response;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      response = await fetch(`${GEMINI_URL}?key=${process.env.GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: requestBody,
+      });
+      if (response.ok || (response.status !== 503 && response.status !== 429)) break;
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 700 * (attempt + 1)));
+    }
 
     if (!response.ok) {
       console.error('chat: Gemini HTTP', response.status, await response.text().catch(() => ''));
