@@ -106,8 +106,11 @@ queries** (`$1, $2 …`) everywhere — never string-concatenate SQL; wrap multi
 | 16 | `ward_admission` | Admission of a patient to a bed |
 | 17 | `ambulance` | The centre's ambulances (two vehicles) |
 | 18 | `ambulance_dispatch` | Log of each ambulance trip/emergency call |
+| 19 | `token_request` | Online token request a patient submits for a unit/date; reviewed (approved → issues a token, or rejected/cancelled) by a receptionist (Part II feature) |
 
 **Application-layer table (add for Part II auth):** `app_user` (auth/roles, Section 4.17).
+
+**Schema additions for Part II features:** `patient.photo_url` (passport photo, Section 4.3), `token.status` now also allows `EXPIRED` (48-hour auto-expiry, Section 4.7), and the `token_request` table above (Section 4.20).
 
 ---
 
@@ -159,6 +162,7 @@ Data-type coverage across the schema (requirement #2): `SERIAL/INT`, `VARCHAR/CH
 | academic_dept | VARCHAR(60) | |
 | guardian_id | INT | FK → patient(patient_id) — set only when category = FAMILY |
 | registration_date | DATE | NOT NULL, DEFAULT CURRENT_DATE |
+| photo_url | VARCHAR(255) | Passport photo filename; uploaded by reception, served only through a JWT-guarded endpoint (a patient may fetch only their own) |
 
 ### 4.4 `health_card`
 | Column | Type | Constraints |
@@ -199,8 +203,10 @@ Data-type coverage across the schema (requirement #2): `SERIAL/INT`, `VARCHAR/CH
 | unit_id | INT | NOT NULL, FK → unit |
 | issue_datetime | TIMESTAMP | NOT NULL, DEFAULT CURRENT_TIMESTAMP |
 | token_date | DATE | NOT NULL, DEFAULT CURRENT_DATE |
-| status | VARCHAR(10) | NOT NULL, DEFAULT 'WAITING', CHECK IN (WAITING, SERVED, CANCELLED) |
+| status | VARCHAR(10) | NOT NULL, DEFAULT 'WAITING', CHECK IN (WAITING, SERVED, CANCELLED, EXPIRED) |
 |  | | UNIQUE (unit_id, token_date, token_number) |
+
+> *Token lifecycle (Part II):* a `WAITING` token becomes `SERVED` when a doctor records the visit, `CANCELLED` if voided, or `EXPIRED` automatically once it is older than 48 hours. The expiry is applied server-side (a sweep runs before every token read) — see Section 10.2.
 
 > *No `patient_id` here:* the patient is reached through `health_card` (`health_card_id → card.patient_id`). Storing it would create the transitive dependency `health_card_id → patient_id`, breaking BCNF.
 
@@ -366,6 +372,23 @@ Data-type coverage across the schema (requirement #2): `SERIAL/INT`, `VARCHAR/CH
 | remarks | TEXT | |
 |  | | CHECK (return_datetime IS NULL OR return_datetime > dispatch_datetime) |
 
+### 4.20 `token_request` (Part II feature — online token request)
+| Column | Type | Constraints |
+|---|---|---|
+| request_id | SERIAL | PK |
+| patient_id | INT | NOT NULL, FK → patient |
+| unit_id | INT | NOT NULL, FK → unit |
+| preferred_date | DATE | NOT NULL (0–30 days out; enforced at the app layer) |
+| reason | TEXT | Patient's symptom/reason (optional) |
+| status | VARCHAR(12) | NOT NULL, DEFAULT 'PENDING', CHECK IN (PENDING, APPROVED, REJECTED) |
+| reject_reason | TEXT | Set on rejection / auto-rejection / patient cancellation |
+| created_at | TIMESTAMP | NOT NULL, DEFAULT CURRENT_TIMESTAMP |
+| reviewed_by | INT | FK → app_user(user_id) — the receptionist who processed it |
+| reviewed_at | TIMESTAMP | When processed |
+| token_id | INT | FK → token(token_id) — set when APPROVED (links to the issued token) |
+
+> *Reviewed_by references `app_user`, so this table is created AFTER `app_user` in the DDL.* Approval is atomic (`UPDATE … WHERE status='PENDING' RETURNING *`) so two receptionists cannot double-issue; a request whose `preferred_date` has passed is auto-rejected instead of issuing a stale token; a patient may cancel only their own `PENDING` request. See Section 10.2.
+
 ---
 
 ## 5. SQL DDL (`db/01_schema.sql`)
@@ -414,7 +437,8 @@ CREATE TABLE patient (
   university_id     VARCHAR(20) UNIQUE,
   academic_dept     VARCHAR(60),
   guardian_id       INT REFERENCES patient(patient_id),
-  registration_date DATE NOT NULL DEFAULT CURRENT_DATE
+  registration_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  photo_url         VARCHAR(255)            -- passport photo filename (uploaded by reception; served via JWT-guarded endpoint)
 );
 
 CREATE TABLE health_card (
@@ -454,7 +478,7 @@ CREATE TABLE token (
   issue_datetime TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   token_date     DATE NOT NULL DEFAULT CURRENT_DATE,
   status         VARCHAR(10) NOT NULL DEFAULT 'WAITING'
-                 CHECK (status IN ('WAITING','SERVED','CANCELLED')),
+                 CHECK (status IN ('WAITING','SERVED','CANCELLED','EXPIRED')),
   UNIQUE (unit_id, token_date, token_number)
 );
 
@@ -610,6 +634,26 @@ CREATE TABLE app_user (
   is_active          BOOLEAN DEFAULT TRUE,
   created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Online token request (Part II feature). Created AFTER app_user because
+-- reviewed_by references app_user(user_id). A patient submits a request; a
+-- receptionist approves it (which issues a token and links token_id) or rejects
+-- it. A patient may also cancel a PENDING request (status -> REJECTED, reason
+-- 'Cancelled by patient').
+CREATE TABLE token_request (
+  request_id     SERIAL PRIMARY KEY,
+  patient_id     INT NOT NULL REFERENCES patient(patient_id),
+  unit_id        INT NOT NULL REFERENCES unit(unit_id),
+  preferred_date DATE NOT NULL,
+  reason         TEXT,
+  status         VARCHAR(12) NOT NULL DEFAULT 'PENDING'
+                 CHECK (status IN ('PENDING','APPROVED','REJECTED')),
+  reject_reason  TEXT,
+  created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reviewed_by    INT REFERENCES app_user(user_id),
+  reviewed_at    TIMESTAMP,
+  token_id       INT REFERENCES token(token_id)   -- set when APPROVED
+);
 ```
 
 ---
@@ -641,12 +685,19 @@ Populate realistic volumes so aggregates and `HAVING` are meaningful:
   Urine R/E, Stool R/E, HbA1C, X-ray Chest, ECG, Ultrasonogram (set `available_days='TUE,WED,THU'`).
 - **test_order:** ~30 rows across statuses; some COMPLETED with results.
 - **bed:** 30 isolation beds; **ward_admission:** ~10 rows, a few currently ADMITTED for chicken pox/mumps.
+- **token_request (Part II):** 6 rows covering every status — APPROVED ones linked to an issued
+  `token_id`, a REJECTED one with a reason, and PENDING ones awaiting review (`token_request_request_id_seq`
+  is reset with `setval` after the explicit-id inserts).
+- **patient.photo_url (Part II):** populated for patients whose passport photo has been uploaded
+  by reception; uploaded image files live under `server/uploads/patients/` (UUID filenames), not in the DB.
 
 ---
 
 ## 7. Functional Dependencies & Normalization (report item 8.i)
 
-**Result: all 18 tables are in BCNF** (hence 3NF, 2NF, 1NF). The test for BCNF is: for every
+**Result: all base tables are in BCNF** (hence 3NF, 2NF, 1NF) — the 18 core tables below, plus
+the Part II `token_request` (candidate key `request_id`; every attribute depends only on it) and
+`app_user`. The test for BCNF is: for every
 non-trivial FD `X → Y`, `X` must be a superkey. Below, each table's candidate key(s) and its
 non-trivial FDs are listed; in every case the only determinants are candidate keys.
 
@@ -1152,10 +1203,14 @@ Everything below is written so the assistant can generate working code without g
     "jsonwebtoken": "^9.0",
     "cors": "^2.8",
     "dotenv": "^16.3",
-    "nodemailer": "^6.9"
+    "nodemailer": "^6.9",
+    "multer": "^2.2"
   }
 }
 ```
+> Part II additions: **`multer`** for passport-photo uploads. The AI Health
+> Assistant uses the built-in global `fetch` (Node 18+) to call the Gemini REST
+> API — no extra SDK package is required.
 
 **Frontend (`client/package.json` — Vite + React):**
 ```json
@@ -1164,7 +1219,9 @@ Everything below is written so the assistant can generate working code without g
     "react": "^18",
     "react-dom": "^18",
     "react-router-dom": "^6",
-    "axios": "^1.6"
+    "axios": "^1.6",
+    "lucide-react": "^0.4",
+    "recharts": "^3.8"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4",
@@ -1195,6 +1252,11 @@ SMTP_USER=your-email@gmail.com
 SMTP_PASS=your-app-password
 SMTP_FROM=MMCMS <noreply@mmcms.du.ac.bd>
 CLIENT_URL=http://localhost:5173
+
+# AI Health Assistant (Part II) — get a key at https://aistudio.google.com/apikey
+# Server-side only; never exposed to the frontend. If unset, the assistant
+# degrades gracefully ("temporarily unavailable") instead of crashing.
+GEMINI_API_KEY=your-gemini-api-key
 ```
 
 #### 10.1.3 Authentication flow (step-by-step, with email verification)
@@ -1539,6 +1601,109 @@ PATIENT:
 - `trip_type` — select: EMERGENCY / TRANSFER / REFERRAL / PICKUP / OTHER
 - `requested_by` — text input (e.g. "Hall authority (call slip)")
 - `remarks` — textarea
+
+---
+
+## 10.2 Part II — Feature Additions (built after the original spec)
+
+These features extend the Part II web application. They add **one new table**
+(`token_request`), **one new column** (`patient.photo_url`), and **one new token
+status** (`EXPIRED`) — all documented in Sections 3–6 above — plus several new
+backend endpoints and frontend pages/components. No existing feature was removed.
+
+### 10.2.1 Patient passport photo
+- **Schema:** `patient.photo_url` stores a UUID image filename; files live under
+  `server/uploads/patients/`, never in the DB.
+- **Backend (`routes/patients.js`):** `POST /api/patients/:id/photo` (RECEPTIONIST/ADMIN)
+  uploads/replaces a photo via **multer** — MIME-validated (`jpeg/jpg/png`), 2 MB
+  cap, UUID filename (`crypto.randomUUID()`), old file deleted on replace.
+  `GET /api/patients/:id/photo` is **JWT-guarded** (no `express.static`): a PATIENT
+  may fetch only their own photo (403 otherwise); `path.basename()` + `fs.existsSync`
+  guard against traversal; `Cache-Control: private`.
+- **Frontend:** reception registration/edit form has a photo picker with preview;
+  the patient dashboard shows the photo as the profile avatar; the health-card page
+  shows a click-to-zoom overlay (Escape/backdrop to close). Protected images are
+  fetched as blobs (`responseType:'blob'` → `URL.createObjectURL`).
+
+### 10.2.2 Online token request + printable token card
+- **Schema:** `token_request` (Section 4.20).
+- **Backend (`routes/token-requests.js`, mounted at `/api/token-requests`):**
+  - `POST /` (PATIENT) — submit a request; validates active/non-expired health
+    card, unit active, date 0–30 days out, no duplicate PENDING, no existing token
+    for that unit/date.
+  - `GET /my` (PATIENT) — own requests (joins the issued token + its live status).
+  - `GET /pending`, `GET /processed` (RECEPTIONIST) — review queues; `/pending`
+    also returns `rostered_doctors` (a `duty_roster` count for the unit+date) so the
+    UI can warn when **no doctor is rostered** (informational; does not block).
+  - `PUT /:id/approve` (RECEPTIONIST) — **atomic** issue: re-validates the card,
+    auto-rejects if the card is invalid or the **preferred date has passed**
+    (compared via DB `CURRENT_DATE`), otherwise inserts the token and links it with
+    a single `UPDATE … WHERE status='PENDING' RETURNING *` (concurrency-safe — two
+    receptionists cannot double-issue).
+  - `PUT /:id/reject` (RECEPTIONIST) — reject with a required reason.
+  - `PUT /:id/cancel` (PATIENT) — cancel **own** `PENDING` request (403 if not the
+    owner, 400 if not pending) → status `REJECTED`, reason `Cancelled by patient`.
+- **Printable card** — `GET /api/tokens/:id/details` (RECEPTIONIST/DOCTOR/PATIENT;
+  a patient may view only their own) feeds `TokenCardModal`, a shared print-ready,
+  zoomable card with `window.print()` and an `EXPIRED`/`CANCELLED` watermark.
+- **Frontend:** patient "Request a Token" page (form + unified *My Tokens* list);
+  receptionist "Token Requests" page (approve/reject with the no-doctor warning,
+  collapsible processed history); the Token Queue auto-opens the printable card
+  after issuing.
+
+### 10.2.3 Token lifecycle & server-side expiry
+- A `WAITING` token → `SERVED` (doctor records the visit), `CANCELLED` (voided), or
+  `EXPIRED` automatically once older than 48 hours.
+- **`utils/tokenExpiry.js → expireStaleTokens(pool)`** runs
+  `UPDATE token SET status='EXPIRED' WHERE status='WAITING' AND issue_datetime < NOW() - INTERVAL '48 hours'`
+  **before every token read** (`GET /api/tokens`, `/api/tokens/mine`,
+  `/api/tokens/:id/details`, `/api/token-requests/my`).
+- **Patient "My Tokens"** unifies directly-issued and online tokens with source
+  labels (*Online – Pending / Online – Accepted / Directly Issued / Online –
+  Rejected*); active = `WAITING` within 48 h, everything else (served/cancelled/
+  expired/rejected) drops to a collapsible *Past* section.
+- **Receptionist Token Queue** gains a Today / All-history toggle (`GET /api/tokens?scope=all`)
+  and an Active/Past split; the default (today-only) behaviour is unchanged for the
+  doctor queue and dashboards.
+
+### 10.2.4 Patient Health Analytics (`routes/health-analytics.js`, PATIENT-only)
+Four computed read-only views (charts via **recharts**):
+- `GET /active-medications` — course end-date & days-remaining via date arithmetic,
+  grouped active / ending-soon / completed.
+- `GET /follow-ups` — a self-join detecting **attended vs missed** follow-ups
+  (±3-day window, subsequent visits only), grouped missed/today/upcoming/attended.
+- `GET /vitals` — `LAG()` window functions for per-visit BP/temp/weight/pulse deltas.
+- `GET /test-insights` — `LAG()`/`COUNT()` partitioned by test for per-test trends,
+  with normal-range parsing on the frontend.
+
+### 10.2.5 Pharmacist Dispense History (`routes/dispense.js`, ADMIN + PHARMACIST)
+- `GET /api/dispense/history` — fully **parameterized** search (patient name /
+  medicine name / exact dispense_id), date-range, payment (free/paid), `medicine_id`
+  and `dispensed_by` filters, with pagination + total count. LEFT joins so an
+  orphaned dispense still surfaces ("Unknown patient") instead of vanishing.
+- `GET /api/dispense/history/summary` — `COUNT/SUM/FILTER` overview stats for a date
+  range (defaults to today); distinct prescriptions & patients; avg excludes free.
+- `GET /api/dispense/history/:id` — one dispense + all items in its prescription
+  (per-item dispensed/charged totals) + guardian resolution for FAMILY billing.
+- **Frontend:** searchable/filterable/paginated table with an expandable detail
+  panel (prescription context, billing breakdown, "records are permanent" note).
+
+### 10.2.6 AI Health Assistant chatbot (`routes/chat.js`, PATIENT-only)
+- `POST /api/chat` (`{ message, history }`) fetches the patient's own records
+  directly from the DB (profile, health card, last 10 visits, active/completed
+  meds, tests, upcoming + missed follow-ups), injects them into a comprehensive
+  system prompt, and calls the **Gemini API** (`gemini-2.5-flash`) server-side.
+- **Security:** `patient_id` comes from the JWT only; an explicit role check returns
+  **403** for every non-PATIENT (including ADMIN); the API key is server-side only.
+- **Resilience:** missing key → friendly 503; Gemini 503/429 → retried (3 attempts,
+  backoff) then a friendly message; safety block → "please rephrase"; empty
+  candidate → "couldn't generate a response"; DB-fetch failure → still answers
+  general health questions with a "data unavailable" note.
+- **Frontend (`components/ChatWidget.jsx`):** a floating bottom-right widget
+  rendered by `DashboardLayout` **for the PATIENT role only**. Conversation lives in
+  React state (no storage — lost on refresh, preserved across page navigation);
+  hardcoded welcome message (not sent to the API); Enter-to-send, typing dots,
+  lightweight bold/list/line-break formatting; English & Bangla.
 
 ---
 
