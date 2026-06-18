@@ -2,7 +2,7 @@ import {
   Shield, CreditCard, Stethoscope, Pill, FlaskConical, User,
   BarChart3, Users, Hash, Calendar, Ambulance, ClipboardList,
   Clock, BedDouble, AlertTriangle, FileText, HeartPulse, UserCheck, Building2,
-  Inbox, CalendarPlus, Activity,
+  Inbox, CalendarPlus, Activity, History,
 } from 'lucide-react';
 
 export const ROLES = [
@@ -47,6 +47,7 @@ export const NAV = {
     { k: 'dispense', l: 'Dispense', i: ClipboardList },
     { k: 'stock', l: 'Stock', i: Pill },
     { k: 'lowstock', l: 'Low stock', i: AlertTriangle },
+    { k: 'history', l: 'Dispense History', i: History },
   ],
   LAB_TECH: [
     { k: 'dash', l: 'Dashboard', i: BarChart3 },

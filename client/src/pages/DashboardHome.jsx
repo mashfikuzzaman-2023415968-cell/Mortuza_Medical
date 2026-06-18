@@ -21,6 +21,7 @@ import PharmacyDashboard from './pharmacist/PharmacyDashboard';
 import DispenseQueue from './pharmacist/DispenseQueue';
 import MedicinesPage from './pharmacist/MedicinesPage';
 import LowStockPage from './pharmacist/LowStockPage';
+import DispenseHistoryPage from './pharmacist/DispenseHistoryPage';
 import LabDashboard from './lab-tech/LabDashboard';
 import PendingTestsPage from './lab-tech/PendingTestsPage';
 import ResultsHistoryPage from './lab-tech/ResultsHistoryPage';
@@ -298,6 +299,8 @@ export default function DashboardHome() {
         <MedicinesPage />
       ) : nav === 'lowstock' && user.role === 'PHARMACIST' ? (
         <LowStockPage />
+      ) : nav === 'history' && user.role === 'PHARMACIST' ? (
+        <DispenseHistoryPage />
       ) : nav === 'pending' && user.role === 'LAB_TECH' ? (
         <PendingTestsPage />
       ) : nav === 'results' && user.role === 'LAB_TECH' ? (
