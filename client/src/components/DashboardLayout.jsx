@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Menu, LogOut, HeartPulse, Sun, Moon } from 'lucide-react';
 import { NAV, ROLES, ROLE_LABEL } from '../config/roles';
 import { useTheme } from '../context/ThemeContext';
+import ChatWidget from './ChatWidget';
 
 export default function DashboardLayout({ role, username, nav, onNavChange, onLogout, navBadges = {}, children }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -92,6 +93,9 @@ export default function DashboardLayout({ role, username, nav, onNavChange, onLo
 
         <div className="flex-1 p-5 overflow-auto space-y-4">{children}</div>
       </main>
+
+      {/* Floating AI Health Assistant — patients only, persists across all pages */}
+      {role === 'PATIENT' && <ChatWidget />}
     </div>
   );
 }
