@@ -15,6 +15,11 @@ const PUBLIC_ROLES = ['DOCTOR', 'RECEPTIONIST', 'PHARMACIST', 'LAB_TECH', 'PATIE
 // Roles that require an admin to flip is_active to TRUE before they can log in.
 const ROLES_REQUIRING_APPROVAL = ['DOCTOR', 'RECEPTIONIST', 'PHARMACIST', 'LAB_TECH'];
 
+// Input format guards. Username: letters/digits/dot/underscore, 3–40 chars
+// (matches the VARCHAR(40) column). Email: a basic "x@y.z" shape.
+const USERNAME_RE = /^[A-Za-z0-9._]{3,40}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
   try {
@@ -29,8 +34,14 @@ router.post('/register', async (req, res) => {
     if (!PUBLIC_ROLES.includes(role)) {
       return res.status(400).json({ success: false, error: 'Invalid role' });
     }
-    if (password.length < 6) {
-      return res.status(400).json({ success: false, error: 'Password must be at least 6 characters' });
+    if (typeof username !== 'string' || !USERNAME_RE.test(username)) {
+      return res.status(400).json({ success: false, error: 'Username must be 3–40 characters: letters, digits, dots or underscores only' });
+    }
+    if (typeof email !== 'string' || !EMAIL_RE.test(email)) {
+      return res.status(400).json({ success: false, error: 'Please provide a valid email address' });
+    }
+    if (typeof password !== 'string' || password.length < 8) {
+      return res.status(400).json({ success: false, error: 'Password must be at least 8 characters' });
     }
 
     // ── PATIENT: link-to-existing-record flow ──────────────────────────────
@@ -142,8 +153,13 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Username/email and password are required' });
     }
 
+    // Select only the columns login needs (incl. password_hash for the bcrypt
+    // compare) rather than SELECT * — avoids ever pulling unexpected/sensitive
+    // columns into scope. The hash is used only for comparison, never returned.
     const result = await pool.query(
-      'SELECT * FROM app_user WHERE (username = $1 OR email = $1)',
+      `SELECT user_id, username, password_hash, role, doctor_id, patient_id,
+              email, email_verified, is_active
+       FROM app_user WHERE (username = $1 OR email = $1)`,
       [username]
     );
     if (result.rows.length === 0) {
