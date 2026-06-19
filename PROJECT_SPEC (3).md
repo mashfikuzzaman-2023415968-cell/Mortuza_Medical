@@ -663,7 +663,8 @@ CREATE TABLE token_request (
 Populate realistic volumes so aggregates and `HAVING` are meaningful:
 
 - **unit:** 7 rows (Outpatient-Male, Outpatient-Female&Child, Dental, Eye, Homeo, Physiotherapy, Pathology, Radiology).
-- **shift:** Morning `08:00–13:00`, Afternoon `13:00–18:00`, Night `18:00–08:00`.
+- **shift:** Morning `08:00–13:00`, Afternoon `13:00–18:00`, Night `18:00–08:00`,
+  plus (Part II) Friday Morning `08:30–12:30` and Friday Afternoon `15:30–20:30` — 5 rows.
 - **doctor:** ~30 rows. Use the real roster names — e.g. female doctors *Ferdousi Purabi Chowdhury,
   Shamima Parvin, Rakhi Pal, Razia Rahman, Mahbuba Akter, Nazia Jabin*; male doctors *Sharif
   Kamaruddin, Md Omar Al Masud, A.M. Sajjad Hossain, Md Arifur Reza Sikder, Safkat Hasan Jami,
@@ -1704,6 +1705,39 @@ Four computed read-only views (charts via **recharts**):
   React state (no storage — lost on refresh, preserved across page navigation);
   hardcoded welcome message (not sent to the API); Enter-to-send, typing dots,
   lightweight bold/list/line-break formatting; English & Bangla.
+
+### 10.2.7 Duty roster upgrade (Friday shifts, live availability, bulk entry, gender)
+No schema change beyond **two new `shift` rows** — `Friday Morning` (08:30–12:30)
+and `Friday Afternoon` (15:30–20:30); the `shift` table structure is unchanged.
+
+- **Friday shifts:** the admin roster form loads shifts from the DB via a new
+  `GET /api/roster/shifts`, so the Friday shifts appear automatically. On a Friday
+  it shows an info note (Friday hours) and, if a *regular* Morning/Afternoon shift
+  is chosen for a Friday, a non-blocking warning to consider the Friday shifts.
+  Shift times are always rendered from the `shift` table, never hardcoded.
+- **`GET /api/doctors/available-now`** (ADMIN/RECEPTIONIST/DOCTOR/PATIENT): doctors
+  on shift *right now* (UNION on-call-today), computed against the server clock
+  with overnight-shift wrap handled (`LOCALTIME` vs `start_time`/`end_time`; note
+  `CURRENT_TIME` is `timetz` and cannot be used with `to_char`). A doctor who is
+  both on-shift and on-call is de-duplicated (keeps ON_SHIFT); **phone numbers are
+  stripped for the PATIENT role**. Returns `meta` (date, time, day, current shift,
+  on-shift/on-call counts). Empty result (e.g. 3 AM) is a normal empty list, not an error.
+- **Shared `DoctorsAvailableNow` component** (`compact` + full modes): a green
+  pulsing "live" dot, 60-second auto-refresh (interval cleared on unmount; keeps
+  last-known data with a warning if a refresh fails), client-side **gender filter**
+  (All/Male/Female), per-doctor "ends in Xh Ym" countdown, units-with-no-doctor
+  notes, and on-call badges. Mounted on the receptionist dashboard (compact),
+  the receptionist + patient doctor pages (full), and the admin dashboard (compact).
+- **`POST /api/roster/bulk`** (ADMIN): create one entry per selected weekday across
+  a date range — validated (doctor/shift/unit exist, end ≥ start, start today-or-
+  future via DB `CURRENT_DATE`, ≤ 90 days, ≥ 1 weekday) — using
+  `INSERT … ON CONFLICT (doctor_id, duty_date, shift_id) DO NOTHING`, returning
+  `{ created, skipped, total_days }`. A "Bulk Add" form on the admin roster page
+  (7 weekday checkboxes, Select/Clear all, Friday warning) sits alongside the
+  unchanged single-entry create/edit/delete.
+- **Gender grouping:** pill filters (All/Male/Female) on the admin roster table,
+  the availability component, and the doctor directory (`DoctorsReadOnly`). The
+  doctors-list endpoint now also returns the non-sensitive `gender` field.
 
 ---
 
