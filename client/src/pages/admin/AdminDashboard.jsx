@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Users, Stethoscope, BedDouble, Ambulance, DollarSign, Clock, UserCheck, AlertCircle, CheckCircle2, XCircle, Inbox } from 'lucide-react';
 import api from '../../api/axios';
+import DoctorsAvailableNow from '../../components/DoctorsAvailableNow';
 
 function StatCard({ icon: Icon, label, value, sub, color, onClick }) {
   return (
@@ -64,6 +65,9 @@ export default function AdminDashboard({ onNavChange }) {
         <StatCard icon={UserCheck} label="Pending approvals" value={val('pending_approvals')} color="bg-orange-100 text-orange-600" onClick={() => onNavChange('pending')} />
         <StatCard icon={Inbox} label="Pending token requests" value={loading ? '…' : (pendingTokenReqs ?? '—')} color="bg-teal-100 text-teal-600" onClick={() => {}} />
       </div>
+
+      {/* Doctors available now (compact) */}
+      <DoctorsAvailableNow showPhone={true} compact={true} showGenderFilter={false} onViewAll={() => onNavChange('roster')} />
 
       {/* Ambulance status widget */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">

@@ -37,6 +37,20 @@ router.get('/', verifyToken, authorize('RECEPTIONIST', 'DOCTOR'), async (req, re
   }
 });
 
+// GET /api/roster/shifts - list all shifts (so the roster form picks up Friday
+// shifts automatically). RECEPTIONIST/DOCTOR allowed too; ADMIN always passes.
+router.get('/shifts', verifyToken, authorize('RECEPTIONIST', 'DOCTOR'), async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT shift_id, shift_name, start_time, end_time FROM shift ORDER BY shift_id'
+    );
+    return res.json({ success: true, data: result.rows });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
 // POST /api/roster - create a duty roster entry (ADMIN only)
 router.post('/', verifyToken, authorize(), async (req, res) => {
   try {
@@ -57,6 +71,71 @@ router.post('/', verifyToken, authorize(), async (req, res) => {
     if (err.code === '23505') {
       return res.status(409).json({ success: false, error: 'Doctor already has a roster entry for this date and shift' });
     }
+    console.error(err);
+    return res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
+// POST /api/roster/bulk - create many roster entries across a date range (ADMIN only)
+router.post('/bulk', verifyToken, authorize(), async (req, res) => {
+  try {
+    const { doctor_id, shift_id, unit_id, start_date, end_date, days_of_week, is_oncall } = req.body;
+
+    if (!doctor_id || !shift_id || !start_date || !end_date) {
+      return res.status(400).json({ success: false, error: 'doctor_id, shift_id, start_date and end_date are required' });
+    }
+    if (!Array.isArray(days_of_week) || days_of_week.length === 0) {
+      return res.status(400).json({ success: false, error: 'Select at least one day' });
+    }
+    if (!days_of_week.every((d) => Number.isInteger(d) && d >= 0 && d <= 6)) {
+      return res.status(400).json({ success: false, error: 'days_of_week values must be 0–6' });
+    }
+
+    // Referential checks
+    const [doc, shift] = await Promise.all([
+      pool.query('SELECT 1 FROM doctor WHERE doctor_id = $1', [doctor_id]),
+      pool.query('SELECT 1 FROM shift WHERE shift_id = $1', [shift_id]),
+    ]);
+    if (doc.rows.length === 0) return res.status(400).json({ success: false, error: 'Doctor not found' });
+    if (shift.rows.length === 0) return res.status(400).json({ success: false, error: 'Shift not found' });
+    if (unit_id) {
+      const unit = await pool.query('SELECT 1 FROM unit WHERE unit_id = $1', [unit_id]);
+      if (unit.rows.length === 0) return res.status(400).json({ success: false, error: 'Unit not found' });
+    }
+
+    // Date validation against the DB's own "today" (timezone-consistent).
+    const { rows: [{ today }] } = await pool.query('SELECT CURRENT_DATE::text AS today');
+    if (start_date < today) {
+      return res.status(400).json({ success: false, error: 'start_date must be today or in the future' });
+    }
+    if (end_date < start_date) {
+      return res.status(400).json({ success: false, error: 'end_date must be on or after start_date' });
+    }
+    const start = new Date(start_date + 'T00:00:00');
+    const end = new Date(end_date + 'T00:00:00');
+    const dayCount = Math.round((end - start) / 86400000) + 1;
+    if (dayCount > 90) {
+      return res.status(400).json({ success: false, error: 'Maximum range is 90 days' });
+    }
+
+    let created = 0;
+    let skipped = 0;
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      if (!days_of_week.includes(d.getDay())) continue;
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const ins = await pool.query(
+        `INSERT INTO duty_roster (doctor_id, shift_id, unit_id, duty_date, is_oncall)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (doctor_id, duty_date, shift_id) DO NOTHING
+         RETURNING roster_id`,
+        [doctor_id, shift_id, unit_id || null, dateStr, !!is_oncall]
+      );
+      if (ins.rowCount > 0) created += 1; else skipped += 1;
+    }
+
+    return res.status(201).json({ success: true, data: { created, skipped, total_days: created + skipped } });
+  } catch (err) {
+    if (err.code === '23503') return res.status(400).json({ success: false, error: 'Invalid doctor_id, shift_id or unit_id' });
     console.error(err);
     return res.status(500).json({ success: false, error: 'Server error' });
   }

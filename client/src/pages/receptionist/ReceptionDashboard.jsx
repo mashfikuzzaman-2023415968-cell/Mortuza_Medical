@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Users, Hash, CreditCard, Clock, UserPlus } from 'lucide-react';
 import api from '../../api/axios';
+import DoctorsAvailableNow from '../../components/DoctorsAvailableNow';
 
 function StatCard({ icon: Icon, label, value, color }) {
   return (
@@ -47,6 +48,13 @@ export default function ReceptionDashboard({ onNavChange }) {
         <StatCard icon={Hash} label="Tokens issued today" value={stats.tokensToday} color="bg-violet-100 text-violet-600" />
         <StatCard icon={Clock} label="Waiting in queue" value={stats.waiting} color="bg-amber-100 text-amber-600" />
       </div>
+
+      <DoctorsAvailableNow
+        showPhone={true}
+        compact={true}
+        showGenderFilter={false}
+        onViewAll={() => onNavChange('doctors')}
+      />
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
         <h3 className="text-lg font-semibold text-gray-800 mb-4">Quick actions</h3>

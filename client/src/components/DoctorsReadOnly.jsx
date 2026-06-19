@@ -12,16 +12,23 @@ const TYPE_BADGE = {
 
 const ALL_TYPES = ['GENERAL', 'SPECIALIST', 'EYE', 'DENTAL', 'HOMEO', 'PHYSIO'];
 
+const PILL = (active) =>
+  `rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+    active ? 'bg-sky-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+  }`;
+
 export default function DoctorsReadOnly({ doctors, loading, showPhone = true, title, subtitle }) {
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [genderFilter, setGenderFilter] = useState('ALL');
 
   const filtered = doctors.filter((d) => {
     const matchesQuery = !query ||
       d.full_name.toLowerCase().includes(query.toLowerCase()) ||
       (d.specialization || '').toLowerCase().includes(query.toLowerCase());
     const matchesType = !typeFilter || d.doctor_type === typeFilter;
-    return matchesQuery && matchesType;
+    const matchesGender = genderFilter === 'ALL' || d.gender === genderFilter;
+    return matchesQuery && matchesType && matchesGender;
   });
 
   return (
@@ -51,6 +58,13 @@ export default function DoctorsReadOnly({ doctors, loading, showPhone = true, ti
           <option value="">All types</option>
           {ALL_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
+      </div>
+
+      {/* Gender filter (same pill style as Available Now) */}
+      <div className="flex gap-2">
+        {[['ALL', 'All'], ['M', 'Male'], ['F', 'Female']].map(([k, l]) => (
+          <button key={k} onClick={() => setGenderFilter(k)} className={PILL(genderFilter === k)}>{l}</button>
+        ))}
       </div>
 
       {loading ? (

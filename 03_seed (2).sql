@@ -106,7 +106,9 @@ INSERT INTO health_card (card_id, card_number, patient_id, issue_date, expiry_da
 INSERT INTO shift (shift_id, shift_name, start_time, end_time) VALUES
  (1,'Morning','08:00','13:00'),
  (2,'Afternoon','13:00','18:00'),
- (3,'Night','18:00','08:00');
+ (3,'Night','18:00','08:00'),
+ (4,'Friday Morning','08:30','12:30'),
+ (5,'Friday Afternoon','15:30','20:30');
 
 -- ---------- 6. DUTY_ROSTER (sample week 04-08 Jan 2026, Sun-Thu) ----------
 INSERT INTO duty_roster (roster_id, doctor_id, shift_id, unit_id, duty_date, is_oncall) VALUES
