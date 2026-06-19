@@ -2,9 +2,18 @@ import { useEffect, useRef, useState } from 'react';
 import { MessageCircle, X, HeartPulse, ChevronDown, Send } from 'lucide-react';
 import api from '../api/axios';
 
-/* Escape HTML, then apply lightweight formatting (no markdown lib). */
+/* Escape HTML, then apply lightweight formatting (no markdown lib).
+   Escape ALL five HTML-sensitive characters (not just < and >) so the
+   output is safe in any context — including attribute values, should the
+   formatter ever be extended to emit attributes. & must come first so the
+   entities we introduce aren't double-escaped. */
 function escapeHtml(s) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 function inlineFormat(line) {
   return escapeHtml(line).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
