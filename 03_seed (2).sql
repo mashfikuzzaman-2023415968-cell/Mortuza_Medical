@@ -79,6 +79,12 @@ INSERT INTO patient (patient_id, full_name, date_of_birth, gender, blood_group, 
  (19,'Rezaul Karim','2008-12-12','M','O+',NULL,NULL,'Palashi Staff Qtr, DU','FAMILY',NULL,NULL,14,'2024-10-05'),
  (20,'Salma Mizan','1978-06-06','F','B+','01720000020',NULL,'Azimpur, Dhaka','FAMILY',NULL,NULL,13,'2024-09-06');
 
+-- Attached DU hall for students (Part II). Seed students live in their hall, so
+-- hall_name is derived from the hall address; a student living off-campus would
+-- keep a home address while reception records the attached hall here.
+UPDATE patient SET hall_name = TRIM(REPLACE(address, ', DU', ''))
+  WHERE patient_category = 'STUDENT' AND address ILIKE '%hall%';
+
 -- ---------- 4. HEALTH_CARD ----------
 INSERT INTO health_card (card_id, card_number, patient_id, issue_date, expiry_date, photo_submitted, status) VALUES
  (1 ,'HC-2025-0001',1 ,'2025-01-10','2027-01-10',TRUE ,'ACTIVE'),

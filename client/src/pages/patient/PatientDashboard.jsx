@@ -112,6 +112,9 @@ export default function PatientDashboard({ onNavChange }) {
                 {profile?.blood_group && (
                   <span className="text-xs text-gray-400">Blood: {profile.blood_group}</span>
                 )}
+                {profile?.hall_name && (
+                  <span className="text-xs text-gray-400">Hall: {profile.hall_name}</span>
+                )}
                 {profile?.phone && (
                   <span className="text-xs text-gray-400">{profile.phone}</span>
                 )}

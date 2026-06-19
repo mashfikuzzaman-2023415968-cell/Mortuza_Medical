@@ -43,8 +43,10 @@ CREATE TABLE patient (
                     CHECK (patient_category IN ('STUDENT','TEACHER','STAFF','FAMILY')),
   university_id     VARCHAR(20) UNIQUE,
   academic_dept     VARCHAR(60),
+  hall_name         VARCHAR(60),            -- attached DU hall (students). A student living off-campus has a home address but still an attached hall.
   guardian_id       INT REFERENCES patient(patient_id),
-  registration_date DATE NOT NULL DEFAULT CURRENT_DATE
+  registration_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  photo_url         VARCHAR(255)            -- passport photo filename (uploaded by reception; served via a JWT-guarded endpoint)
 );
 
 CREATE TABLE health_card (

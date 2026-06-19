@@ -16,6 +16,7 @@ const EMPTY_FORM = {
   patient_category: 'STUDENT',
   university_id: '',
   academic_dept: '',
+  hall_name: '',
   guardian_id: '',
 };
 
@@ -218,6 +219,18 @@ function PatientForm({ initial, guardians, hasExistingPhoto, onSubmit, onCancel,
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
           />
         </div>
+        {form.patient_category === 'STUDENT' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Hall name</label>
+            <input
+              type="text" value={form.hall_name || ''}
+              onChange={(e) => handleChange('hall_name', e.target.value)}
+              placeholder="e.g. Jagannath Hall"
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+            />
+            <p className="text-xs text-gray-400 mt-1">The student's attached hall (even if they live off-campus).</p>
+          </div>
+        )}
         <PhotoPicker hasExisting={hasExistingPhoto} onChange={setPhotoFile} />
       </div>
       <div className="flex justify-end gap-2 pt-2">
@@ -338,6 +351,7 @@ export default function PatientsPage() {
         patient_category: editing.patient_category || 'STUDENT',
         university_id: editing.university_id || '',
         academic_dept: editing.academic_dept || '',
+        hall_name: editing.hall_name || '',
         guardian_id: editing.guardian_id || '',
       }
     : EMPTY_FORM;

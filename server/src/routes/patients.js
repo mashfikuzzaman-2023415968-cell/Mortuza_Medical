@@ -85,7 +85,7 @@ router.get('/', verifyToken, authorize('RECEPTIONIST', 'DOCTOR'), async (req, re
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const result = await pool.query(
       `SELECT patient_id, full_name, date_of_birth, gender, blood_group, phone, email, address,
-              patient_category, university_id, academic_dept, guardian_id, registration_date, photo_url
+              patient_category, university_id, academic_dept, hall_name, guardian_id, registration_date, photo_url
        FROM patient
        ${where}
        ORDER BY patient_id DESC`,
@@ -129,7 +129,7 @@ router.get('/:id', verifyToken, authorize('RECEPTIONIST', 'DOCTOR'), async (req,
   try {
     const patientResult = await pool.query(
       `SELECT patient_id, full_name, date_of_birth, gender, blood_group, phone, email, address,
-              patient_category, university_id, academic_dept, guardian_id, registration_date, photo_url
+              patient_category, university_id, academic_dept, hall_name, guardian_id, registration_date, photo_url
        FROM patient WHERE patient_id = $1`,
       [req.params.id]
     );
@@ -158,7 +158,7 @@ router.post('/', verifyToken, authorize('RECEPTIONIST'), async (req, res) => {
   try {
     const {
       full_name, date_of_birth, gender, blood_group, phone, email, address,
-      patient_category, university_id, academic_dept, guardian_id,
+      patient_category, university_id, academic_dept, hall_name, guardian_id,
     } = req.body;
 
     if (!full_name || !patient_category) {
@@ -191,10 +191,13 @@ router.post('/', verifyToken, authorize('RECEPTIONIST'), async (req, res) => {
       }
     }
 
+    // hall_name only applies to students; blank for everyone else.
+    const hallName = patient_category === 'STUDENT' ? (hall_name || null) : null;
+
     const result = await pool.query(
       `INSERT INTO patient (full_name, date_of_birth, gender, blood_group, phone, email, address,
-                             patient_category, university_id, academic_dept, guardian_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                             patient_category, university_id, academic_dept, guardian_id, hall_name)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [
         full_name,
@@ -208,6 +211,7 @@ router.post('/', verifyToken, authorize('RECEPTIONIST'), async (req, res) => {
         patient_category === 'FAMILY' ? null : university_id,
         academic_dept || null,
         patient_category === 'FAMILY' ? guardian_id : null,
+        hallName,
       ]
     );
 
@@ -251,7 +255,7 @@ router.put('/:id', verifyToken, authorize('RECEPTIONIST'), async (req, res) => {
   try {
     const {
       full_name, date_of_birth, gender, blood_group, phone, email, address,
-      patient_category, university_id, academic_dept, guardian_id,
+      patient_category, university_id, academic_dept, hall_name, guardian_id,
     } = req.body;
 
     if (!full_name || !patient_category) {
@@ -284,12 +288,15 @@ router.put('/:id', verifyToken, authorize('RECEPTIONIST'), async (req, res) => {
       }
     }
 
+    // hall_name only applies to students; blank for everyone else.
+    const hallName = patient_category === 'STUDENT' ? (hall_name || null) : null;
+
     const result = await pool.query(
       `UPDATE patient SET
          full_name = $1, date_of_birth = $2, gender = $3, blood_group = $4, phone = $5,
          email = $6, address = $7, patient_category = $8, university_id = $9,
-         academic_dept = $10, guardian_id = $11
-       WHERE patient_id = $12
+         academic_dept = $10, guardian_id = $11, hall_name = $12
+       WHERE patient_id = $13
        RETURNING *`,
       [
         full_name,
@@ -303,6 +310,7 @@ router.put('/:id', verifyToken, authorize('RECEPTIONIST'), async (req, res) => {
         patient_category === 'FAMILY' ? null : university_id,
         academic_dept || null,
         patient_category === 'FAMILY' ? guardian_id : null,
+        hallName,
         req.params.id,
       ]
     );
