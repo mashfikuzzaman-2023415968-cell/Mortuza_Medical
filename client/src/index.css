@@ -28,6 +28,11 @@
 .hover\:bg-gray-50:hover  { background-color: #e6f1ea; }
 .hover\:bg-gray-100:hover { background-color: #dcebe2; }
 
+/* App chrome (left tab bar + top bar) — a deeper green tone than the page,
+   so the navigation frame reads as distinct from the content area.
+   Theme-aware: the `.dark` rule below wins in dark mode. */
+.app-chrome { background-color: #e2eee6; }
+
 /* ─────────────────────────────────────────────
    DARK MODE OVERRIDES
    Sit outside @layer so they outrank Tailwind's
@@ -46,6 +51,10 @@
 .dark .bg-gray-50     { background-color: #161a21; }  /* app / page background */
 .dark .bg-gray-100    { background-color: #2a313b; }  /* chips, subtle fills */
 .dark .bg-gray-200    { background-color: #353d48; }  /* raised fills, track */
+
+/* App chrome (left tab bar + top bar) — subtly green-tinted dark, distinct
+   from both the page and the cards */
+.dark .app-chrome     { background-color: #19211d; }
 
 /* Text — soft, never pure white; secondary tones stay readable */
 .dark .text-gray-900  { color: #cdd9e5; }
