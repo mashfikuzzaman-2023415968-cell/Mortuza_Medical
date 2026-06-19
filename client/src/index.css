@@ -4,36 +4,6 @@
 @variant dark (&:where(.dark, .dark *));
 
 /* ─────────────────────────────────────────────
-   LIGHT MODE — soft "sage" tint
-   A calming green wash so the UI isn't stark white.
-   Plain selectors sit outside @layer to beat Tailwind
-   utilities; the higher-specificity `.dark .X` rules
-   below still win in dark mode (so this is light-only).
-   ───────────────────────────────────────────── */
-
-/* Page canvas — gentle sage instead of near-white gray */
-.bg-gray-50 { background-color: #eef5f0; }
-
-/* Cards / sidebar / header — barely-there warm-green white, not clinical #fff */
-.bg-white { background-color: #fafdfb; }
-
-/* Borders & dividers — soft green-gray edges */
-.border-gray-50  { border-color: #e7f0ea; }
-.border-gray-100 { border-color: #dde9e1; }
-.border-gray-200 { border-color: #cddfd4; }
-.divide-gray-50  > * + * { border-color: #e7f0ea; }
-.divide-gray-100 > * + * { border-color: #dde9e1; }
-
-/* Nav items / table rows — calm green hover instead of plain gray */
-.hover\:bg-gray-50:hover  { background-color: #e6f1ea; }
-.hover\:bg-gray-100:hover { background-color: #dcebe2; }
-
-/* App chrome (left tab bar + top bar) — a deeper green tone than the page,
-   so the navigation frame reads as distinct from the content area.
-   Theme-aware: the `.dark` rule below wins in dark mode. */
-.app-chrome { background-color: #e2eee6; }
-
-/* ─────────────────────────────────────────────
    DARK MODE OVERRIDES
    Sit outside @layer so they outrank Tailwind's
    layered utilities without needing !important.
@@ -51,10 +21,6 @@
 .dark .bg-gray-50     { background-color: #161a21; }  /* app / page background */
 .dark .bg-gray-100    { background-color: #2a313b; }  /* chips, subtle fills */
 .dark .bg-gray-200    { background-color: #353d48; }  /* raised fills, track */
-
-/* App chrome (left tab bar + top bar) — subtly green-tinted dark, distinct
-   from both the page and the cards */
-.dark .app-chrome     { background-color: #19211d; }
 
 /* Text — soft, never pure white; secondary tones stay readable */
 .dark .text-gray-900  { color: #cdd9e5; }

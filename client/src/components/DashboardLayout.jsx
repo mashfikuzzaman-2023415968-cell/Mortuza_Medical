@@ -16,7 +16,7 @@ export default function DashboardLayout({ role, username, nav, onNavChange, onLo
       <aside
         className={`${
           sidebarOpen ? 'w-56' : 'w-0 overflow-hidden'
-        } app-chrome border-r border-gray-100 flex-shrink-0 transition-all duration-200 relative`}
+        } bg-white border-r border-gray-100 flex-shrink-0 transition-all duration-200 relative`}
       >
         <div className="p-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
@@ -61,7 +61,7 @@ export default function DashboardLayout({ role, username, nav, onNavChange, onLo
 
       {/* Main */}
       <main className="flex-1 flex flex-col min-h-screen">
-        <header className="app-chrome border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+        <header className="bg-white border-b border-gray-100 px-5 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen((v) => !v)}
