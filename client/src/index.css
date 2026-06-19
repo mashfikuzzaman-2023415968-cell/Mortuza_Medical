@@ -9,111 +9,119 @@
    layered utilities without needing !important.
    ───────────────────────────────────────────── */
 
-/* Backgrounds */
-.dark .bg-white       { background-color: #1e293b; }
-.dark .bg-gray-50     { background-color: #0f172a; }
-.dark .bg-gray-100    { background-color: #293548; }
-.dark .bg-gray-200    { background-color: #334155; }
+/* ---------------------------------------------------------------
+   Calm "soft slate" dark palette.
+   Layered neutral surfaces (page < card < raised) with gentle,
+   slightly-warm separation, and a soft off-white primary text
+   (#cdd9e5) instead of harsh pure white to avoid halation/eye-strain.
+   --------------------------------------------------------------- */
 
-/* Text */
-.dark .text-gray-900  { color: #f8fafc; }
-.dark .text-gray-800  { color: #f1f5f9; }
-.dark .text-gray-700  { color: #e2e8f0; }
-.dark .text-gray-600  { color: #cbd5e1; }
-.dark .text-gray-500  { color: #94a3b8; }
-.dark .text-gray-400  { color: #64748b; }
-.dark .text-gray-300  { color: #475569; }
+/* Surfaces — page is the deepest, cards sit one step above it */
+.dark .bg-white       { background-color: #20252e; }  /* cards, popovers, modals */
+.dark .bg-gray-50     { background-color: #161a21; }  /* app / page background */
+.dark .bg-gray-100    { background-color: #2a313b; }  /* chips, subtle fills */
+.dark .bg-gray-200    { background-color: #353d48; }  /* raised fills, track */
 
-/* Borders */
-.dark .border-gray-50  { border-color: #1e293b; }
-.dark .border-gray-100 { border-color: #334155; }
-.dark .border-gray-200 { border-color: #475569; }
+/* Text — soft, never pure white; secondary tones stay readable */
+.dark .text-gray-900  { color: #cdd9e5; }
+.dark .text-gray-800  { color: #c4cfdb; }
+.dark .text-gray-700  { color: #b0bcc9; }
+.dark .text-gray-600  { color: #98a4b2; }
+.dark .text-gray-500  { color: #7f8b99; }
+.dark .text-gray-400  { color: #69727f; }
+.dark .text-gray-300  { color: #4e5660; }
+
+/* Borders — quiet separation, visible but not contrasty */
+.dark .border-gray-50  { border-color: #20252e; }
+.dark .border-gray-100 { border-color: #2b323c; }
+.dark .border-gray-200 { border-color: #363e49; }
 
 /* Table / list dividers */
-.dark .divide-gray-50  > * + * { border-color: #1e293b; }
-.dark .divide-gray-100 > * + * { border-color: #293548; }
+.dark .divide-gray-50  > * + * { border-color: #262d36; }
+.dark .divide-gray-100 > * + * { border-color: #313842; }
 
 /* Hover states */
-.dark .hover\:bg-gray-50:hover  { background-color: #1e293b; }
-.dark .hover\:bg-gray-100:hover { background-color: #293548; }
+.dark .hover\:bg-gray-50:hover  { background-color: #262d36; }
+.dark .hover\:bg-gray-100:hover { background-color: #313842; }
 
-/* Coloured status badges — muted for dark backgrounds */
-.dark .bg-emerald-100 { background-color: #064e3b; }
-.dark .text-emerald-700 { color: #6ee7b7; }
-.dark .bg-sky-100  { background-color: #0c3a5c; }
-.dark .bg-sky-50   { background-color: #0c2a47; }
-.dark .text-sky-700 { color: #38bdf8; }
-.dark .text-sky-600 { color: #7dd3fc; }
-.dark .bg-amber-100 { background-color: #5c3a00; }
-.dark .text-amber-700 { color: #fcd34d; }
-.dark .text-amber-800 { color: #fde68a; }
-.dark .bg-amber-50  { background-color: #451a03; }
-.dark .border-amber-200 { border-color: #92400e; }
-.dark .bg-rose-100  { background-color: #4c0519; }
-.dark .text-rose-600 { color: #fb7185; }
-.dark .text-rose-700 { color: #fda4af; }
-.dark .bg-violet-100 { background-color: #2e1065; }
-.dark .text-violet-600 { color: #c084fc; }
-.dark .text-violet-700 { color: #d8b4fe; }
-.dark .bg-orange-100 { background-color: #431407; }
-.dark .text-orange-600 { color: #fb923c; }
-.dark .text-orange-700 { color: #fdba74; }
-.dark .bg-indigo-100 { background-color: #1e1b4b; }
-.dark .text-indigo-700 { color: #a5b4fc; }
-.dark .bg-green-100  { background-color: #14532d; }
-.dark .text-green-700 { color: #86efac; }
+/* Coloured status badges — tinted dark surface + soft light text,
+   tuned to sit harmoniously on the new card colour */
+.dark .bg-emerald-100 { background-color: #14392b; }
+.dark .text-emerald-700 { color: #74dcab; }
+.dark .bg-sky-100  { background-color: #16384f; }
+.dark .bg-sky-50   { background-color: #132b3c; }
+.dark .text-sky-700 { color: #6cc3ef; }
+.dark .text-sky-600 { color: #8fd2f4; }
+.dark .bg-amber-100 { background-color: #44330f; }
+.dark .text-amber-700 { color: #ecca84; }
+.dark .text-amber-800 { color: #f1d89a; }
+.dark .bg-amber-50  { background-color: #36280f; }
+.dark .border-amber-200 { border-color: #6a5320; }
+.dark .bg-rose-100  { background-color: #431a24; }
+.dark .text-rose-600 { color: #f1909e; }
+.dark .text-rose-700 { color: #f4a9b3; }
+.dark .bg-violet-100 { background-color: #2a2150; }
+.dark .text-violet-600 { color: #bfa6ee; }
+.dark .text-violet-700 { color: #d0bef3; }
+.dark .bg-orange-100 { background-color: #42260f; }
+.dark .text-orange-600 { color: #f0a574; }
+.dark .text-orange-700 { color: #f3b78c; }
+.dark .bg-indigo-100 { background-color: #21254c; }
+.dark .text-indigo-700 { color: #abb3f0; }
+.dark .bg-green-100  { background-color: #163a26; }
+.dark .text-green-700 { color: #82d39c; }
 
 /* Hover on coloured interactive buttons */
-.dark .hover\:bg-red-50:hover     { background-color: #450a0a; }
-.dark .hover\:bg-sky-50:hover     { background-color: #0c2a47; }
-.dark .hover\:bg-violet-50:hover  { background-color: #1a0e36; }
-.dark .hover\:bg-emerald-50:hover { background-color: #052e1a; }
-.dark .hover\:bg-orange-50:hover  { background-color: #2c0f05; }
-.dark .hover\:bg-amber-50:hover   { background-color: #2c1200; }
+.dark .hover\:bg-red-50:hover     { background-color: #3a1719; }
+.dark .hover\:bg-sky-50:hover     { background-color: #132b3c; }
+.dark .hover\:bg-violet-50:hover  { background-color: #211a40; }
+.dark .hover\:bg-emerald-50:hover { background-color: #103024; }
+.dark .hover\:bg-orange-50:hover  { background-color: #321d0e; }
+.dark .hover\:bg-amber-50:hover   { background-color: #2f2310; }
 
 /* Alert / notice boxes */
-.dark .bg-red-50      { background-color: #450a0a; }
-.dark .border-red-200 { border-color: #991b1b; }
-.dark .text-red-600   { color: #f87171; }
-.dark .text-red-700   { color: #fca5a5; }
+.dark .bg-red-50      { background-color: #3a1719; }
+.dark .border-red-200 { border-color: #7a2e31; }
+.dark .text-red-600   { color: #f0909a; }
+.dark .text-red-700   { color: #f4a8ad; }
 
-/* Card shadows */
+/* Card shadows — soft, so cards lift via border + tone, not heavy black */
 .dark .shadow-sm {
-  --tw-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.5);
+  --tw-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.35);
   box-shadow: var(--tw-shadow);
 }
 .dark .shadow-lg {
-  --tw-shadow: 0 10px 25px -3px rgb(0 0 0 / 0.6);
+  --tw-shadow: 0 10px 24px -6px rgb(0 0 0 / 0.45);
   box-shadow: var(--tw-shadow);
 }
 
-/* Login page gradient */
-.dark .from-slate-50 { --tw-gradient-from: #0f172a; }
-.dark .via-sky-50    { --tw-gradient-via:  #0f172a; }
-.dark .to-teal-50    { --tw-gradient-to:   #0c1f1f; }
+/* Login page gradient — calm, low-saturation backdrop */
+.dark .from-slate-50 { --tw-gradient-from: #14181f; }
+.dark .via-sky-50    { --tw-gradient-via:  #161b23; }
+.dark .to-teal-50    { --tw-gradient-to:   #121b1b; }
 
-/* Form controls */
+/* Form controls — inputs sit slightly darker than the card for an inset feel */
 .dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
 .dark textarea,
 .dark select {
-  background-color: #0f172a;
-  color: #f1f5f9;
-  border-color: #334155;
+  background-color: #181d25;
+  color: #cdd9e5;
+  border-color: #363e49;
 }
 
 .dark input:focus:not([type="checkbox"]):not([type="radio"]),
 .dark textarea:focus,
 .dark select:focus {
-  border-color: #475569;
+  border-color: #4a5563;
 }
 
 .dark input::placeholder,
-.dark textarea::placeholder { color: #64748b; }
+.dark textarea::placeholder { color: #69727f; }
 
 /* Scrollbar (subtle) */
-.dark ::-webkit-scrollbar-track { background: #0f172a; }
-.dark ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-.dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
+.dark ::-webkit-scrollbar-track { background: #161a21; }
+.dark ::-webkit-scrollbar-thumb { background: #353d48; border-radius: 4px; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #454d58; }
 
 /* Photo zoom animations */
 @keyframes fadeIn {
