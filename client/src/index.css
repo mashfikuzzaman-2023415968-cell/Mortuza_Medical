@@ -4,6 +4,31 @@
 @variant dark (&:where(.dark, .dark *));
 
 /* ─────────────────────────────────────────────
+   LIGHT MODE — soft "sage" tint
+   A calming green wash so the UI isn't stark white.
+   Plain selectors sit outside @layer to beat Tailwind
+   utilities; the higher-specificity `.dark .X` rules
+   below still win in dark mode (so this is light-only).
+   ───────────────────────────────────────────── */
+
+/* Page canvas — gentle sage instead of near-white gray */
+.bg-gray-50 { background-color: #eef5f0; }
+
+/* Cards / sidebar / header — barely-there warm-green white, not clinical #fff */
+.bg-white { background-color: #fafdfb; }
+
+/* Borders & dividers — soft green-gray edges */
+.border-gray-50  { border-color: #e7f0ea; }
+.border-gray-100 { border-color: #dde9e1; }
+.border-gray-200 { border-color: #cddfd4; }
+.divide-gray-50  > * + * { border-color: #e7f0ea; }
+.divide-gray-100 > * + * { border-color: #dde9e1; }
+
+/* Nav items / table rows — calm green hover instead of plain gray */
+.hover\:bg-gray-50:hover  { background-color: #e6f1ea; }
+.hover\:bg-gray-100:hover { background-color: #dcebe2; }
+
+/* ─────────────────────────────────────────────
    DARK MODE OVERRIDES
    Sit outside @layer so they outrank Tailwind's
    layered utilities without needing !important.
