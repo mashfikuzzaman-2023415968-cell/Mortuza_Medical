@@ -81,6 +81,11 @@ router.get('/', verifyToken, authorize('RECEPTIONIST', 'DOCTOR'), async (req, re
     if (without_card === 'true') {
       conditions.push(`NOT EXISTS (SELECT 1 FROM health_card hc WHERE hc.patient_id = patient.patient_id)`);
     }
+    // Patients with no portal login yet — for the admin's "link account to
+    // patient" dropdown (no raw ID lookup).
+    if (req.query.unlinked === 'true') {
+      conditions.push(`NOT EXISTS (SELECT 1 FROM app_user au WHERE au.patient_id = patient.patient_id)`);
+    }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const result = await pool.query(

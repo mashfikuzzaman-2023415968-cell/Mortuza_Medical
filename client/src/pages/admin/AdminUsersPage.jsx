@@ -17,6 +17,7 @@ const EMPTY_FORM = { username: '', password: '', email: '', role: 'RECEPTIONIST'
 export default function AdminUsersPage() {
   const [users, setUsers] = useState([]);
   const [unlinkedDoctors, setUnlinkedDoctors] = useState([]);
+  const [unlinkedPatients, setUnlinkedPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
@@ -36,14 +37,17 @@ export default function AdminUsersPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Doctors with no login yet — for the "link account to doctor" dropdown.
-  const loadUnlinkedDoctors = useCallback(() => {
+  // Doctors / patients with no login yet — for the "link account" dropdowns.
+  const loadUnlinked = useCallback(() => {
     api.get('/doctors', { params: { unlinked: 'true' } })
       .then((r) => setUnlinkedDoctors(r.data.data || []))
       .catch(() => {});
+    api.get('/patients', { params: { unlinked: 'true' } })
+      .then((r) => setUnlinkedPatients(r.data.data || []))
+      .catch(() => {});
   }, []);
 
-  useEffect(() => { load(); loadUnlinkedDoctors(); }, [load, loadUnlinkedDoctors]);
+  useEffect(() => { load(); loadUnlinked(); }, [load, loadUnlinked]);
 
   const pending = users.filter((u) => u.email_verified && !u.is_active);
   const active = users.filter((u) => u.is_active);
@@ -67,7 +71,7 @@ export default function AdminUsersPage() {
       setShowForm(false);
       setForm(EMPTY_FORM);
       load();
-      loadUnlinkedDoctors(); // the just-linked doctor drops off the list
+      loadUnlinked(); // the just-linked doctor/patient drops off the list
     } catch (err) {
       setFormError(err.response?.data?.error || 'Create failed.');
     } finally {
@@ -152,8 +156,22 @@ export default function AdminUsersPage() {
             )}
             {form.role === 'PATIENT' && (
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Patient ID</label>
-                <input type="number" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400" value={form.patient_id} onChange={(e) => set('patient_id', e.target.value)} placeholder="patient_id from DB" />
+                <label className="block text-xs font-medium text-gray-600 mb-1">Link to patient *</label>
+                <select
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+                  value={form.patient_id}
+                  onChange={(e) => set('patient_id', e.target.value)}
+                >
+                  <option value="">— Select a patient —</option>
+                  {unlinkedPatients.map((p) => (
+                    <option key={p.patient_id} value={p.patient_id}>
+                      {p.full_name} — {p.patient_category}{p.university_id ? ` (${p.university_id})` : ''}
+                    </option>
+                  ))}
+                </select>
+                {unlinkedPatients.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">No patient records without an account. Register the patient on the Patients page first.</p>
+                )}
               </div>
             )}
           </div>
