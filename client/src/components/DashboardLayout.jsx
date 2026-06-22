@@ -21,9 +21,9 @@ export default function DashboardLayout({ role, username, nav, onNavChange, onLo
         <div className="p-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <HeartPulse size={20} className="text-teal-600" />
-            <span className="font-bold text-gray-900 text-sm">MMCMS</span>
+            <span className="font-bold text-gray-900 text-sm">MDC</span>
           </div>
-          <p className="text-xs text-gray-400 mt-0.5">Mortuza Medical Centre</p>
+          <p className="text-xs text-gray-400 mt-0.5">MDC Web Portal</p>
         </div>
 
         <nav className="p-3 space-y-1">

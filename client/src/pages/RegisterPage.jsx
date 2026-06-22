@@ -100,10 +100,10 @@ export default function RegisterPage() {
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-3">
             <HeartPulse size={32} className="text-teal-600" />
-            <span className="text-2xl font-bold text-gray-900">MMCMS</span>
+            <span className="text-2xl font-bold text-gray-900">MDC</span>
           </div>
           <h1 className="text-xl font-semibold text-gray-800">Create an account</h1>
-          <p className="text-sm text-gray-500 mt-1">Mortuza Medical Centre — University of Dhaka</p>
+          <p className="text-sm text-gray-500 mt-1">Shaheed Buddhijibi Dr. Mohammad Mortuza Medical Centre, University of Dhaka</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">

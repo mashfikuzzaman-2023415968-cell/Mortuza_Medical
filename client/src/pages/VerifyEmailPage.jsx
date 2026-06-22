@@ -48,7 +48,7 @@ export default function VerifyEmailPage() {
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-3">
             <HeartPulse size={32} className="text-teal-600" />
-            <span className="text-2xl font-bold text-gray-900">MMCMS</span>
+            <span className="text-2xl font-bold text-gray-900">MDC</span>
           </div>
         </div>
 

@@ -18,7 +18,7 @@ export default function ReceptionUnitsPage() {
       units={units}
       loading={loading}
       title="Medical Centre Units"
-      subtitle="Departments and service units available at Mortuza Medical Centre."
+      subtitle="Departments and service units available at MDC."
     />
   );
 }

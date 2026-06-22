@@ -84,7 +84,7 @@ export default function ChatWidget() {
     if (isOpen) setTimeout(() => inputRef.current?.focus(), 50);
   }, [isOpen]);
 
-  const welcomeText = `Hello ${firstName || 'there'}! 👋 I'm your health assistant at Mortuza Medical Centre.
+  const welcomeText = `Hello ${firstName || 'there'}! 👋 I'm your health assistant at MDC.
 
 I can help you with:
 - Your visits, prescriptions, and test results
@@ -149,7 +149,7 @@ What would you like to know?`;
               </div>
               <div>
                 <p className="text-sm font-semibold leading-tight">Health Assistant</p>
-                <p className="text-[11px] text-white/80 leading-tight">Mortuza Medical Centre</p>
+                <p className="text-[11px] text-white/80 leading-tight">MDC Web Portal</p>
               </div>
             </div>
             <button onClick={() => setIsOpen(false)} title="Minimize"

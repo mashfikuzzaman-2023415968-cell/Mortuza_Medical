@@ -46,7 +46,7 @@ import PatientTokenRequestsPage from './patient/TokenRequestsPage';
 
 const ROLE_WELCOME = {
   ADMIN: {
-    tagline: 'Full command of Mortuza Medical Centre is at your fingertips.',
+    tagline: 'Full command of MDC is at your fingertips.',
     tip: 'Monitor today\'s activity, manage pending approvals, keep the ambulance fleet ready, and generate reports — all from one place.',
     color: 'text-rose-600',
     bg: 'bg-rose-50',

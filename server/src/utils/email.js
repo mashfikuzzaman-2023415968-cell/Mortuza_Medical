@@ -27,8 +27,8 @@ async function sendVerificationEmail(email, token) {
   await transporter.sendMail({
     from: process.env.SMTP_FROM,
     to: email,
-    subject: 'MMCMS — Verify your email',
-    html: `<h2>Welcome to MMCMS</h2>
+    subject: 'MDC — Verify your email',
+    html: `<h2>Welcome to the MDC Web Portal</h2>
            <p>Click the link below to verify your email:</p>
            <a href="${verifyUrl}">${verifyUrl}</a>
            <p>This link expires in 24 hours.</p>`,
@@ -49,10 +49,10 @@ async function sendAccountApprovedEmail(email, username) {
   await transporter.sendMail({
     from: process.env.SMTP_FROM,
     to: email,
-    subject: 'MMCMS — Your account has been approved',
+    subject: 'MDC — Your account has been approved',
     html: `<h2>Account approved</h2>
            <p>Hi ${username},</p>
-           <p>Your MMCMS account has been approved by an administrator. You can now log in:</p>
+           <p>Your MDC Web Portal account has been approved by an administrator. You can now log in:</p>
            <a href="${loginUrl}">${loginUrl}</a>`,
   });
 }
@@ -71,11 +71,11 @@ async function sendTestResultEmail({ to, patientName, testName, resultValue, nor
   await transporter.sendMail({
     from: process.env.SMTP_FROM,
     to,
-    subject: `MMCMS — Your test result is ready: ${testName}`,
+    subject: `MDC — Your test result is ready: ${testName}`,
     html: `
       <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#1e293b">
         <div style="background:linear-gradient(135deg,#0284c7,#0d9488);padding:24px 32px;border-radius:12px 12px 0 0">
-          <h1 style="margin:0;color:#fff;font-size:20px">Mortuza Medical Centre</h1>
+          <h1 style="margin:0;color:#fff;font-size:20px">Shaheed Buddhijibi Dr. Mohammad Mortuza Medical Centre</h1>
           <p style="margin:4px 0 0;color:#bae6fd;font-size:13px">Laboratory Report</p>
         </div>
         <div style="background:#f8fafc;padding:28px 32px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px">
@@ -110,7 +110,7 @@ async function sendTestResultEmail({ to, patientName, testName, resultValue, nor
           <a href="${portalUrl}" style="display:inline-block;background:#0284c7;color:#fff;text-decoration:none;padding:11px 24px;border-radius:8px;font-size:14px;font-weight:600">View in patient portal →</a>
 
           <p style="margin:24px 0 0;font-size:12px;color:#94a3b8">
-            This is an automated message from Mortuza Medical Centre Management System. Please do not reply to this email.
+            This is an automated message from Shaheed Buddhijibi Dr. Mohammad Mortuza Medical Centre. Please do not reply to this email.
           </p>
         </div>
       </div>
