@@ -26,6 +26,11 @@ router.get('/', verifyToken, authorize('RECEPTIONIST', 'DOCTOR', 'PATIENT'), asy
       params.push(doctor_type);
       conditions.push(`d.doctor_type = $${params.length}`);
     }
+    // Doctors with no portal login yet — used to populate the admin's
+    // "link account to doctor" dropdown without looking up raw IDs.
+    if (req.query.unlinked === 'true') {
+      conditions.push(`NOT EXISTS (SELECT 1 FROM app_user au WHERE au.doctor_id = d.doctor_id)`);
+    }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const isAdmin = req.user.role === 'ADMIN';
