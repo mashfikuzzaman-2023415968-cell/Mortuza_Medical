@@ -97,6 +97,8 @@ const ROLE_WELCOME = {
 
 function PendingApprovals() {
   const [users, setUsers] = useState([]);
+  const [units, setUnits] = useState([]);
+  const [unitSel, setUnitSel] = useState({}); // { user_id: unit_id } for doctor applicants
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actioningId, setActioningId] = useState(null);
@@ -112,13 +114,16 @@ function PendingApprovals() {
 
   useEffect(() => {
     loadPending();
+    api.get('/units').then((r) => setUnits((r.data.data || []).filter((u) => u.is_active !== false))).catch(() => {});
   }, []);
 
-  const handleApprove = async (id) => {
-    setActioningId(id);
+  const handleApprove = async (u) => {
+    setActioningId(u.user_id);
+    setError('');
     try {
-      await api.put(`/users/${id}/approve`);
-      setUsers((u) => u.filter((x) => x.user_id !== id));
+      const body = u.role === 'DOCTOR' && unitSel[u.user_id] ? { unit_id: Number(unitSel[u.user_id]) } : {};
+      await api.put(`/users/${u.user_id}/approve`, body);
+      setUsers((list) => list.filter((x) => x.user_id !== u.user_id));
     } catch {
       setError('Unable to approve user.');
     } finally {
@@ -154,46 +159,63 @@ function PendingApprovals() {
       ) : users.length === 0 ? (
         <p className="text-sm text-gray-400 py-2">No accounts are awaiting approval.</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
-                <th className="py-2 pr-4 font-medium">Username</th>
-                <th className="py-2 pr-4 font-medium">Email</th>
-                <th className="py-2 pr-4 font-medium">Role</th>
-                <th className="py-2 pr-4 font-medium">Registered</th>
-                <th className="py-2 pr-4 font-medium text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((u) => (
-                <tr key={u.user_id} className="border-b border-gray-50 last:border-0">
-                  <td className="py-2.5 pr-4 font-medium text-gray-700">{u.username}</td>
-                  <td className="py-2.5 pr-4 text-gray-500">{u.email}</td>
-                  <td className="py-2.5 pr-4 text-gray-500">{ROLE_LABEL[u.role] || u.role}</td>
-                  <td className="py-2.5 pr-4 text-gray-500">{new Date(u.created_at).toLocaleDateString()}</td>
-                  <td className="py-2.5 pr-4 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => handleApprove(u.user_id)}
-                        disabled={actioningId === u.user_id}
-                        className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
-                      >
-                        <CheckCircle2 size={14} /> Approve
-                      </button>
-                      <button
-                        onClick={() => handleReject(u.user_id)}
-                        disabled={actioningId === u.user_id}
-                        className="inline-flex items-center gap-1 rounded-lg bg-red-500 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-red-600 disabled:opacity-50"
-                      >
-                        <XCircle size={14} /> Reject
-                      </button>
+        <div className="space-y-3">
+          {users.map((u) => {
+            const isDoc = u.role === 'DOCTOR';
+            const busy = actioningId === u.user_id;
+            return (
+              <div key={u.user_id} className="rounded-xl border border-gray-100 p-4">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-gray-800">{isDoc && u.doctor_name ? u.doctor_name : u.username}</span>
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{ROLE_LABEL[u.role] || u.role}</span>
+                      {isDoc && u.doctor_type && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">{u.doctor_type}</span>}
+                      {isDoc && u.is_parttime && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Part-time</span>}
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      @{u.username} · {u.email} · registered {new Date(u.created_at).toLocaleDateString()}
+                    </p>
+                    {isDoc && (
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {u.specialization ? `${u.specialization} · ` : ''}BMDC: {u.bmdc_reg_no || '—'}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {isDoc && (
+                      <select
+                        value={unitSel[u.user_id] || ''}
+                        onChange={(e) => setUnitSel((s) => ({ ...s, [u.user_id]: e.target.value }))}
+                        className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                        title="Assign a unit"
+                      >
+                        <option value="">— Assign unit —</option>
+                        {units.map((un) => <option key={un.unit_id} value={un.unit_id}>{un.unit_name}</option>)}
+                      </select>
+                    )}
+                    <button
+                      onClick={() => handleApprove(u)}
+                      disabled={busy}
+                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
+                    >
+                      {busy ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Approve
+                    </button>
+                    <button
+                      onClick={() => handleReject(u.user_id)}
+                      disabled={busy}
+                      className="inline-flex items-center gap-1 rounded-lg bg-red-500 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-red-600 disabled:opacity-50"
+                    >
+                      <XCircle size={14} /> Reject
+                    </button>
+                  </div>
+                </div>
+                {isDoc && !unitSel[u.user_id] && (
+                  <p className="text-xs text-amber-600 mt-2">Tip: assign a unit before approving so the doctor's queue works right away.</p>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

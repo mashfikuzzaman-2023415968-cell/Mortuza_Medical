@@ -7,6 +7,7 @@ import { useTheme } from '../context/ThemeContext';
 
 // ADMIN accounts cannot be created through public self-registration.
 const REGISTER_ROLES = ROLES.filter((r) => r.key !== 'ADMIN');
+const DOCTOR_TYPES = ['GENERAL', 'SPECIALIST', 'EYE', 'DENTAL', 'HOMEO', 'PHYSIO'];
 
 const EMPTY_FORM = {
   username: '',
@@ -16,6 +17,15 @@ const EMPTY_FORM = {
   role: 'PATIENT',
   lookupType: 'university_id',
   lookupId: '',
+  // doctor application fields
+  full_name: '',
+  bmdc_reg_no: '',
+  doctor_type: 'GENERAL',
+  specialization: '',
+  designation: '',
+  gender: '',
+  phone: '',
+  is_parttime: false,
 };
 
 export default function RegisterPage() {
@@ -40,8 +50,8 @@ export default function RegisterPage() {
       setError('All fields are required.');
       return;
     }
-    if (form.password.length < 6) {
-      setError('Password must be at least 6 characters.');
+    if (form.password.length < 8) {
+      setError('Password must be at least 8 characters.');
       return;
     }
     if (form.password !== form.confirm) {
@@ -50,6 +60,10 @@ export default function RegisterPage() {
     }
     if (form.role === 'PATIENT' && !form.lookupId.trim()) {
       setError('Please enter your University ID or Health Card Number.');
+      return;
+    }
+    if (form.role === 'DOCTOR' && (!form.full_name.trim() || !form.bmdc_reg_no.trim() || !form.doctor_type)) {
+      setError('Full name, BMDC registration number and doctor type are required.');
       return;
     }
 
@@ -64,6 +78,18 @@ export default function RegisterPage() {
 
       if (form.role === 'PATIENT') {
         payload[form.lookupType] = form.lookupId.trim();
+      }
+      if (form.role === 'DOCTOR') {
+        Object.assign(payload, {
+          full_name: form.full_name.trim(),
+          bmdc_reg_no: form.bmdc_reg_no.trim(),
+          doctor_type: form.doctor_type,
+          specialization: form.specialization.trim() || undefined,
+          designation: form.designation.trim() || undefined,
+          gender: form.gender || undefined,
+          phone: form.phone.trim() || undefined,
+          is_parttime: form.is_parttime,
+        });
       }
 
       const res = await api.post('/auth/register', payload);
@@ -83,6 +109,7 @@ export default function RegisterPage() {
   };
 
   const isPatient = form.role === 'PATIENT';
+  const isDoctor = form.role === 'DOCTOR';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-sky-50 to-teal-50 flex items-center justify-center p-4 relative">
@@ -244,7 +271,7 @@ export default function RegisterPage() {
                     type={showPassword ? 'text' : 'password'}
                     value={form.password}
                     onChange={update('password')}
-                    placeholder="At least 6 characters"
+                    placeholder="At least 8 characters"
                     className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 pr-10 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-400"
                   />
                   <button
@@ -269,13 +296,74 @@ export default function RegisterPage() {
                 />
               </div>
 
+              {/* ── DOCTOR: professional details ── */}
+              {isDoctor && (
+                <div className="space-y-3 rounded-xl border border-emerald-100 bg-emerald-50/40 p-4">
+                  <div className="flex items-start gap-2 text-xs text-emerald-800">
+                    <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
+                    <p>Enter your professional details. After you verify your email, an admin will review them, <strong>assign your unit</strong>, and activate your account.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1.5">Full name *</label>
+                    <input type="text" value={form.full_name} onChange={update('full_name')} placeholder="Dr. Full Name"
+                      className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1.5">BMDC reg. no *</label>
+                      <input type="text" value={form.bmdc_reg_no} onChange={update('bmdc_reg_no')} placeholder="e.g. A-12345"
+                        className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1.5">Type *</label>
+                      <select value={form.doctor_type} onChange={update('doctor_type')}
+                        className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                        {DOCTOR_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1.5">Specialization</label>
+                      <input type="text" value={form.specialization} onChange={update('specialization')} placeholder="e.g. Cardiology"
+                        className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1.5">Designation</label>
+                      <input type="text" value={form.designation} onChange={update('designation')} placeholder="e.g. Medical Officer"
+                        className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1.5">Gender</label>
+                      <select value={form.gender} onChange={update('gender')}
+                        className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                        <option value="">—</option>
+                        <option value="M">Male</option>
+                        <option value="F">Female</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1.5">Phone</label>
+                      <input type="text" value={form.phone} onChange={update('phone')} placeholder="01XXXXXXXXX"
+                        className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input type="checkbox" checked={form.is_parttime} onChange={(e) => setForm((f) => ({ ...f, is_parttime: e.target.checked }))} className="rounded" />
+                    Part-time
+                  </label>
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={loading}
                 className="w-full py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-teal-600 text-white font-medium text-sm hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {loading && <Loader2 size={16} className="animate-spin" />}
-                {loading ? 'Creating account…' : isPatient ? 'Link & create account' : 'Create account'}
+                {loading ? 'Submitting…' : isPatient ? 'Link & create account' : isDoctor ? 'Submit application' : 'Create account'}
               </button>
 
               <p className="text-center text-xs text-gray-400">

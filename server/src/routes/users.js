@@ -46,10 +46,14 @@ router.get('/', verifyToken, authorize(), async (req, res) => {
 router.get('/pending', verifyToken, authorize('ADMIN'), async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT user_id, username, email, role, created_at
-       FROM app_user
-       WHERE email_verified = TRUE AND is_active = FALSE
-       ORDER BY created_at ASC`
+      `SELECT u.user_id, u.username, u.email, u.role, u.created_at, u.doctor_id,
+              d.full_name AS doctor_name, d.specialization, d.doctor_type,
+              d.bmdc_reg_no, d.is_parttime, d.unit_id, un.unit_name
+       FROM app_user u
+       LEFT JOIN doctor d ON d.doctor_id = u.doctor_id
+       LEFT JOIN unit un ON un.unit_id = d.unit_id
+       WHERE u.email_verified = TRUE AND u.is_active = FALSE
+       ORDER BY u.created_at ASC`
     );
     return res.json({ success: true, data: result.rows });
   } catch (err) {
@@ -58,16 +62,29 @@ router.get('/pending', verifyToken, authorize('ADMIN'), async (req, res) => {
   }
 });
 
-// PUT /api/users/:id/approve - activate a pending user
+// PUT /api/users/:id/approve - activate a pending user. For a DOCTOR application,
+// an optional unit_id assigns the doctor's unit at the same time.
 router.put('/:id/approve', verifyToken, authorize('ADMIN'), async (req, res) => {
   try {
+    const { unit_id } = req.body;
+
+    const target = await pool.query('SELECT user_id, role, doctor_id FROM app_user WHERE user_id = $1', [req.params.id]);
+    if (target.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    const t = target.rows[0];
+
+    // Assign the doctor's unit if provided.
+    if (t.role === 'DOCTOR' && t.doctor_id && unit_id) {
+      const unitCheck = await pool.query('SELECT 1 FROM unit WHERE unit_id = $1', [unit_id]);
+      if (unitCheck.rows.length === 0) return res.status(400).json({ success: false, error: 'Selected unit not found' });
+      await pool.query('UPDATE doctor SET unit_id = $1 WHERE doctor_id = $2', [unit_id, t.doctor_id]);
+    }
+
     const result = await pool.query(
       'UPDATE app_user SET is_active = TRUE WHERE user_id = $1 RETURNING user_id, username, email, role, is_active',
       [req.params.id]
     );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'User not found' });
-    }
 
     const user = result.rows[0];
     await sendAccountApprovedEmail(user.email, user.username);
@@ -79,16 +96,23 @@ router.put('/:id/approve', verifyToken, authorize('ADMIN'), async (req, res) => 
   }
 });
 
-// PUT /api/users/:id/reject - permanently remove a pending user
+// PUT /api/users/:id/reject - permanently remove a pending user. For a rejected
+// doctor application, also remove the doctor record it created (a never-active
+// applicant has no visits/roster, so the cleanup is safe; ignored if referenced).
 router.put('/:id/reject', verifyToken, authorize('ADMIN'), async (req, res) => {
   try {
-    const result = await pool.query(
-      'DELETE FROM app_user WHERE user_id = $1 RETURNING user_id',
-      [req.params.id]
-    );
-    if (result.rows.length === 0) {
+    const target = await pool.query('SELECT role, doctor_id FROM app_user WHERE user_id = $1', [req.params.id]);
+    if (target.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
+
+    await pool.query('DELETE FROM app_user WHERE user_id = $1', [req.params.id]);
+
+    const t = target.rows[0];
+    if (t.role === 'DOCTOR' && t.doctor_id) {
+      await pool.query('DELETE FROM doctor WHERE doctor_id = $1', [t.doctor_id]).catch(() => {});
+    }
+
     return res.json({ success: true, message: 'User rejected and removed' });
   } catch (err) {
     console.error(err);

@@ -44,6 +44,11 @@ export default function DoctorDashboard({ onNavChange }) {
 
   return (
     <div className="space-y-6">
+      {!user.unit_id && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <span className="font-medium">No unit assigned yet.</span> An admin needs to assign you to a unit before your token queue will show your patients. Please contact the administrator.
+        </div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={Clock} label="Waiting in queue" value={stats.waiting} color="bg-amber-100 text-amber-600" />
         <StatCard icon={Stethoscope} label="Visits today" value={stats.visitsToday} color="bg-emerald-100 text-emerald-600" />

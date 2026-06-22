@@ -11,6 +11,7 @@ const router = express.Router();
 // Roles selectable via public self-registration. ADMIN accounts can only be
 // created by an existing admin via POST /api/users.
 const PUBLIC_ROLES = ['DOCTOR', 'RECEPTIONIST', 'PHARMACIST', 'LAB_TECH', 'PATIENT'];
+const DOCTOR_TYPES = ['GENERAL', 'SPECIALIST', 'EYE', 'DENTAL', 'HOMEO', 'PHYSIO'];
 
 // Roles that require an admin to flip is_active to TRUE before they can log in.
 const ROLES_REQUIRING_APPROVAL = ['DOCTOR', 'RECEPTIONIST', 'PHARMACIST', 'LAB_TECH'];
@@ -112,6 +113,68 @@ router.post('/register', async (req, res) => {
         success: true,
         message: `Account created for ${patientRow.full_name}. Check your email to verify.`,
         patient_name: patientRow.full_name,
+      });
+    }
+
+    // ── DOCTOR: "apply as a doctor" — create the clinical record + linked login
+    // together (one transaction). unit_id is left for the admin to assign at
+    // approval time. Account is unverified + pending approval like other staff.
+    if (role === 'DOCTOR') {
+      const {
+        full_name, bmdc_reg_no, doctor_type, specialization,
+        designation, gender, phone, is_parttime,
+      } = req.body;
+
+      if (!full_name || !bmdc_reg_no || !doctor_type) {
+        return res.status(400).json({ success: false, error: 'Full name, BMDC registration number and doctor type are required' });
+      }
+      if (!DOCTOR_TYPES.includes(doctor_type)) {
+        return res.status(400).json({ success: false, error: 'Invalid doctor type' });
+      }
+      if (gender && !['M', 'F'].includes(gender)) {
+        return res.status(400).json({ success: false, error: 'Invalid gender' });
+      }
+
+      // Clear, specific uniqueness errors before the transaction.
+      const dupUser = await pool.query('SELECT 1 FROM app_user WHERE username = $1 OR email = $2', [username, email]);
+      if (dupUser.rows.length > 0) return res.status(409).json({ success: false, error: 'Username or email is already registered' });
+      const dupBmdc = await pool.query('SELECT 1 FROM doctor WHERE bmdc_reg_no = $1', [bmdc_reg_no.trim()]);
+      if (dupBmdc.rows.length > 0) return res.status(409).json({ success: false, error: 'A doctor with this BMDC registration number already exists' });
+      const dupDocEmail = await pool.query('SELECT 1 FROM doctor WHERE email = $1', [email]);
+      if (dupDocEmail.rows.length > 0) return res.status(409).json({ success: false, error: 'A doctor with this email already exists' });
+
+      const passwordHash = await bcrypt.hash(password, 10);
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const docResult = await client.query(
+          `INSERT INTO doctor (full_name, gender, bmdc_reg_no, designation, specialization, doctor_type, is_parttime, phone, email, joining_date)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_DATE) RETURNING doctor_id`,
+          [full_name, gender || null, bmdc_reg_no.trim(), designation || null, specialization || null, doctor_type, !!is_parttime, phone || null, email]
+        );
+        const newDoctorId = docResult.rows[0].doctor_id;
+        await client.query(
+          `INSERT INTO app_user (username, password_hash, role, doctor_id, email, verification_token, email_verified, is_active)
+           VALUES ($1, $2, 'DOCTOR', $3, $4, $5, FALSE, FALSE)`,
+          [username, passwordHash, newDoctorId, email, verificationToken]
+        );
+        await client.query('COMMIT');
+      } catch (txErr) {
+        await client.query('ROLLBACK').catch(() => {});
+        if (txErr.code === '23505') {
+          return res.status(409).json({ success: false, error: 'Username, email or BMDC number is already registered' });
+        }
+        throw txErr;
+      } finally {
+        client.release();
+      }
+
+      await sendVerificationEmail(email, verificationToken);
+      return res.status(201).json({
+        success: true,
+        message: 'Application submitted. Verify your email — an admin will review your details, assign your unit, and activate your account.',
       });
     }
 
