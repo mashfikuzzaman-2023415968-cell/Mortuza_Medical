@@ -139,3 +139,12 @@
   0%, 100% { transform: scale(1);   opacity: 1;   }
   50%      { transform: scale(1.4); opacity: 0.4; }
 }
+
+/* Sign-out button (dark mode): white text at rest, brighter red on hover.
+   Placed last so it overrides the shared .dark .text-gray-500 / red rules.
+   The smooth hover fade comes from `transition-colors duration-200` on the button. */
+.dark .signout-btn { color: #f2f5f9; }
+.dark .signout-btn:hover {
+  background-color: #ef4444;   /* red-500 — brighter than the muted shared hover */
+  color: #ffffff;
+}

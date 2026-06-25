@@ -223,6 +223,9 @@ router.post('/', verifyToken, authorize('RECEPTIONIST'), async (req, res) => {
     return res.status(201).json({ success: true, data: result.rows[0] });
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ success: false, error: 'University ID is already registered' });
+    if (err.code === '23514' && err.constraint === 'chk_student_has_id') {
+      return res.status(400).json({ success: false, error: 'A student must have a University ID' });
+    }
     console.error(err);
     return res.status(500).json({ success: false, error: 'Server error' });
   }
@@ -324,6 +327,9 @@ router.put('/:id', verifyToken, authorize('RECEPTIONIST'), async (req, res) => {
     return res.json({ success: true, data: result.rows[0] });
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ success: false, error: 'University ID is already registered' });
+    if (err.code === '23514' && err.constraint === 'chk_student_has_id') {
+      return res.status(400).json({ success: false, error: 'A student must have a University ID' });
+    }
     console.error(err);
     return res.status(500).json({ success: false, error: 'Server error' });
   }

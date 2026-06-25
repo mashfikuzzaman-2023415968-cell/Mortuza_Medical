@@ -46,7 +46,9 @@ export default function RegisterPage() {
     setErrorKind('');
     setSuccess('');
 
-    if (!form.username.trim() || !form.email.trim() || !form.password) {
+    // Patients don't enter an email — their verification link goes to the
+    // address on file for their patient record.
+    if (!form.username.trim() || !form.password || (form.role !== 'PATIENT' && !form.email.trim())) {
       setError('All fields are required.');
       return;
     }
@@ -71,13 +73,15 @@ export default function RegisterPage() {
     try {
       const payload = {
         username: form.username.trim(),
-        email: form.email.trim(),
         password: form.password,
         role: form.role,
       };
 
       if (form.role === 'PATIENT') {
+        // No email field — verification is sent to the address on file.
         payload[form.lookupType] = form.lookupId.trim();
+      } else {
+        payload.email = form.email.trim();
       }
       if (form.role === 'DOCTOR') {
         Object.assign(payload, {
@@ -253,16 +257,24 @@ export default function RegisterPage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">Email</label>
-                <input
-                  type="email"
-                  value={form.email}
-                  onChange={update('email')}
-                  placeholder="you@example.com"
-                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-400"
-                />
-              </div>
+              {!isPatient && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1.5">Email</label>
+                  <input
+                    type="email"
+                    value={form.email}
+                    onChange={update('email')}
+                    placeholder="you@example.com"
+                    className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-400"
+                  />
+                </div>
+              )}
+
+              {isPatient && (
+                <div className="rounded-xl border border-sky-100 bg-sky-50 px-3.5 py-2.5 text-xs text-sky-800">
+                  For your security, the verification link is sent to the email <strong>already on file</strong> for your patient record — not one you type here. If your record has no email, please visit reception.
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">Password</label>

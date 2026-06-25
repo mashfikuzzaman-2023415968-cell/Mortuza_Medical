@@ -78,6 +78,11 @@ router.post('/', verifyToken, authorize('DOCTOR'), async (req, res) => {
       data: { ...insertResult.rows[0], bed_number: bed.bed_number, ward_type: bed.ward_type, patient_name: patientCheck.rows[0].full_name },
     });
   } catch (err) {
+    // If two admissions race for the same free bed, the partial unique index
+    // rejects the loser — surface that as a clear 409 instead of a 500.
+    if (err.code === '23505' && err.constraint === 'uq_bed_active_admission') {
+      return res.status(409).json({ success: false, error: 'That bed was just taken. Please try again.' });
+    }
     console.error(err);
     return res.status(500).json({ success: false, error: 'Server error' });
   }

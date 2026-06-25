@@ -2,3 +2,6 @@ node_modules/
 dist/
 .env
 *.log
+
+# Runtime-uploaded files (patient photos); dir is auto-created by the server
+server/uploads/

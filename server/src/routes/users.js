@@ -143,12 +143,20 @@ router.post('/', verifyToken, authorize('ADMIN'), async (req, res) => {
     if (role === 'PATIENT' && !patient_id) {
       return res.status(400).json({ success: false, error: 'patient_id is required when creating a PATIENT account' });
     }
-    if (doctor_id) {
-      const docCheck = await pool.query('SELECT doctor_id FROM doctor WHERE doctor_id = $1', [doctor_id]);
+
+    // Bind the linked record strictly to the role: only a DOCTOR carries a
+    // doctor_id, only a PATIENT carries a patient_id, everyone else links to
+    // neither. This guarantees the row satisfies chk_role_link regardless of
+    // any extra IDs sent in the request body.
+    const linkedDoctorId = role === 'DOCTOR' ? doctor_id : null;
+    const linkedPatientId = role === 'PATIENT' ? patient_id : null;
+
+    if (linkedDoctorId) {
+      const docCheck = await pool.query('SELECT doctor_id FROM doctor WHERE doctor_id = $1', [linkedDoctorId]);
       if (docCheck.rows.length === 0) return res.status(400).json({ success: false, error: 'doctor_id not found' });
     }
-    if (patient_id) {
-      const patCheck = await pool.query('SELECT patient_id FROM patient WHERE patient_id = $1', [patient_id]);
+    if (linkedPatientId) {
+      const patCheck = await pool.query('SELECT patient_id FROM patient WHERE patient_id = $1', [linkedPatientId]);
       if (patCheck.rows.length === 0) return res.status(400).json({ success: false, error: 'patient_id not found' });
     }
 
@@ -166,11 +174,19 @@ router.post('/', verifyToken, authorize('ADMIN'), async (req, res) => {
       `INSERT INTO app_user (username, password_hash, role, doctor_id, patient_id, email, email_verified, is_active)
        VALUES ($1, $2, $3, $4, $5, $6, TRUE, TRUE)
        RETURNING user_id, username, role, email, is_active, email_verified`,
-      [username, passwordHash, role, doctor_id || null, patient_id || null, email]
+      [username, passwordHash, role, linkedDoctorId, linkedPatientId, email]
     );
 
     return res.status(201).json({ success: true, data: result.rows[0] });
   } catch (err) {
+    // Backstop: surface a friendly message if a DB constraint rejects the row,
+    // rather than a generic 500.
+    if (err.code === '23514' && err.constraint === 'chk_role_link') {
+      return res.status(400).json({ success: false, error: 'The account role and its linked record do not match.' });
+    }
+    if (err.code === '23505') {
+      return res.status(409).json({ success: false, error: 'Username or email is already registered' });
+    }
     console.error(err);
     return res.status(500).json({ success: false, error: 'Server error' });
   }

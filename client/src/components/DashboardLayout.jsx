@@ -51,7 +51,7 @@ export default function DashboardLayout({ role, username, nav, onNavChange, onLo
         <div className="absolute bottom-0 w-56 p-3 border-t border-gray-100">
           <button
             onClick={onLogout}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-500 hover:bg-red-50 hover:text-red-600"
+            className="signout-btn w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors duration-200"
           >
             <LogOut size={16} />
             Sign out

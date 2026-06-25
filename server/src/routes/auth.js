@@ -26,8 +26,8 @@ router.post('/register', async (req, res) => {
   try {
     const { username, password, email, role } = req.body;
 
-    if (!username || !password || !email || !role) {
-      return res.status(400).json({ success: false, error: 'username, password, email and role are required' });
+    if (!username || !password || !role) {
+      return res.status(400).json({ success: false, error: 'username, password and role are required' });
     }
     if (role === 'ADMIN') {
       return res.status(403).json({ success: false, error: 'Admin accounts can only be created by an existing admin' });
@@ -38,8 +38,13 @@ router.post('/register', async (req, res) => {
     if (typeof username !== 'string' || !USERNAME_RE.test(username)) {
       return res.status(400).json({ success: false, error: 'Username must be 3–40 characters: letters, digits, dots or underscores only' });
     }
-    if (typeof email !== 'string' || !EMAIL_RE.test(email)) {
-      return res.status(400).json({ success: false, error: 'Please provide a valid email address' });
+    // Patients don't supply an email: their verification link is sent to the
+    // address already on file for their patient record (identity proof). Every
+    // other role must provide a valid email of their own.
+    if (role !== 'PATIENT') {
+      if (typeof email !== 'string' || !EMAIL_RE.test(email)) {
+        return res.status(400).json({ success: false, error: 'Please provide a valid email address' });
+      }
     }
     if (typeof password !== 'string' || password.length < 8) {
       return res.status(400).json({ success: false, error: 'Password must be at least 8 characters' });
@@ -53,17 +58,18 @@ router.post('/register', async (req, res) => {
         return res.status(400).json({ success: false, error: 'Provide your University ID or Health Card Number to find your patient record' });
       }
 
-      // Look up the patient record by whichever identifier was provided
+      // Look up the patient record by whichever identifier was provided. We pull
+      // the email ON FILE — that is where the verification link will be sent.
       let patientRow;
       if (university_id) {
         const r = await pool.query(
-          'SELECT patient_id, full_name FROM patient WHERE university_id = $1',
+          'SELECT patient_id, full_name, email FROM patient WHERE university_id = $1',
           [university_id.trim()]
         );
         patientRow = r.rows[0];
       } else {
         const r = await pool.query(
-          `SELECT p.patient_id, p.full_name
+          `SELECT p.patient_id, p.full_name, p.email
            FROM health_card hc
            JOIN patient p ON hc.patient_id = p.patient_id
            WHERE hc.card_number = $1`,
@@ -79,6 +85,19 @@ router.post('/register', async (req, res) => {
         });
       }
 
+      // ── Identity proof (Option B) ──────────────────────────────────────────
+      // The verification link is sent to the email already on file for this
+      // patient, NEVER to a user-supplied address. Knowing the (printed)
+      // University ID / health-card number is not enough to claim the account —
+      // you must control the registered inbox.
+      const onFileEmail = (patientRow.email || '').trim();
+      if (!onFileEmail) {
+        return res.status(409).json({
+          success: false,
+          error: 'There is no email on file for this patient record, so we cannot verify your identity online. Please visit the Medical Centre reception to add your email or to have your portal account created for you.',
+        });
+      }
+
       // Check if a portal account already exists for this patient record
       const existingPortal = await pool.query(
         'SELECT user_id FROM app_user WHERE patient_id = $1',
@@ -88,14 +107,15 @@ router.post('/register', async (req, res) => {
         return res.status(409).json({ success: false, error: 'A portal account already exists for this patient record.' });
       }
 
-      // Check username and email uniqueness separately for clearer error messages
+      // Username uniqueness, and ensure the on-file email doesn't already back
+      // another portal login.
       const takenUsername = await pool.query('SELECT user_id FROM app_user WHERE username = $1', [username]);
       if (takenUsername.rows.length > 0) {
         return res.status(409).json({ success: false, error: 'Username already taken' });
       }
-      const takenEmail = await pool.query('SELECT user_id FROM app_user WHERE email = $1', [email]);
+      const takenEmail = await pool.query('SELECT user_id FROM app_user WHERE email = $1', [onFileEmail]);
       if (takenEmail.rows.length > 0) {
-        return res.status(409).json({ success: false, error: 'Email is already registered' });
+        return res.status(409).json({ success: false, error: 'A portal account is already registered to the email on file for this patient record.' });
       }
 
       const passwordHash = await bcrypt.hash(password, 10);
@@ -104,14 +124,14 @@ router.post('/register', async (req, res) => {
       await pool.query(
         `INSERT INTO app_user (username, password_hash, role, patient_id, email, verification_token, email_verified, is_active)
          VALUES ($1, $2, 'PATIENT', $3, $4, $5, FALSE, TRUE)`,
-        [username, passwordHash, patientRow.patient_id, email, verificationToken]
+        [username, passwordHash, patientRow.patient_id, onFileEmail, verificationToken]
       );
 
-      await sendVerificationEmail(email, verificationToken);
+      await sendVerificationEmail(onFileEmail, verificationToken);
 
       return res.status(201).json({
         success: true,
-        message: `Account created for ${patientRow.full_name}. Check your email to verify.`,
+        message: `Account created for ${patientRow.full_name}. We sent a verification link to the email registered for this patient record — open it to finish setting up your login.`,
         patient_name: patientRow.full_name,
       });
     }

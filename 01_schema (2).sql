@@ -46,7 +46,9 @@ CREATE TABLE patient (
   hall_name         VARCHAR(60),            -- attached DU hall (students). A student living off-campus has a home address but still an attached hall.
   guardian_id       INT REFERENCES patient(patient_id),
   registration_date DATE NOT NULL DEFAULT CURRENT_DATE,
-  photo_url         VARCHAR(255)            -- passport photo filename (uploaded by reception; served via a JWT-guarded endpoint)
+  photo_url         VARCHAR(255),           -- passport photo filename (uploaded by reception; served via a JWT-guarded endpoint)
+  -- A student is identified by their university ID, so it must be present.
+  CONSTRAINT chk_student_has_id CHECK (patient_category <> 'STUDENT' OR university_id IS NOT NULL)
 );
 
 CREATE TABLE health_card (
@@ -106,6 +108,29 @@ CREATE TABLE visit (
   pulse          INT,
   follow_up_date DATE
 );
+
+-- A visit attached to a token must belong to that token's patient. A foreign
+-- key can't express this cross-table rule, so a BEFORE trigger enforces it.
+CREATE OR REPLACE FUNCTION trg_visit_token_patient_match() RETURNS trigger AS $$
+DECLARE
+  tok_patient INT;
+BEGIN
+  IF NEW.token_id IS NOT NULL THEN
+    SELECT hc.patient_id INTO tok_patient
+    FROM token t JOIN health_card hc ON hc.card_id = t.health_card_id
+    WHERE t.token_id = NEW.token_id;
+    IF tok_patient IS NOT NULL AND tok_patient <> NEW.patient_id THEN
+      RAISE EXCEPTION 'Visit patient does not match the token''s patient'
+        USING ERRCODE = '23514', CONSTRAINT = 'visit_token_patient_match';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER visit_token_patient_match
+  BEFORE INSERT OR UPDATE ON visit
+  FOR EACH ROW EXECUTE FUNCTION trg_visit_token_patient_match();
 
 CREATE TABLE prescription (
   prescription_id   SERIAL PRIMARY KEY,
@@ -199,6 +224,11 @@ CREATE TABLE ward_admission (
   CHECK (discharge_datetime IS NULL OR discharge_datetime > admit_datetime)
 );
 
+-- A bed can hold at most one ADMITTED patient at a time (discharged rows are
+-- kept for history, so this is a partial unique index rather than a constraint).
+CREATE UNIQUE INDEX uq_bed_active_admission
+  ON ward_admission (bed_id) WHERE status = 'ADMITTED';
+
 CREATE TABLE ambulance (
   ambulance_id    SERIAL PRIMARY KEY,
   registration_no VARCHAR(30) NOT NULL UNIQUE,
@@ -240,7 +270,14 @@ CREATE TABLE app_user (
   verification_token VARCHAR(100),
   email_verified     BOOLEAN NOT NULL DEFAULT FALSE,
   is_active          BOOLEAN DEFAULT TRUE,
-  created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  -- A login's role must match its linked record: DOCTOR -> doctor_id only,
+  -- PATIENT -> patient_id only, and pure-staff roles link to neither.
+  CONSTRAINT chk_role_link CHECK (
+    (role = 'DOCTOR'  AND doctor_id IS NOT NULL AND patient_id IS NULL) OR
+    (role = 'PATIENT' AND patient_id IS NOT NULL AND doctor_id IS NULL) OR
+    (role IN ('ADMIN','RECEPTIONIST','PHARMACIST','LAB_TECH') AND doctor_id IS NULL AND patient_id IS NULL)
+  )
 );
 
 CREATE TABLE token_request (

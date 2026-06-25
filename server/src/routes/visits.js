@@ -182,6 +182,9 @@ router.post('/', verifyToken, authorize('DOCTOR'), async (req, res) => {
     if (err.code === '23505') {
       return res.status(409).json({ success: false, error: 'A visit already exists for this token' });
     }
+    if (err.code === '23514' && err.constraint === 'visit_token_patient_match') {
+      return res.status(400).json({ success: false, error: 'This token belongs to a different patient.' });
+    }
     console.error(err);
     return res.status(500).json({ success: false, error: 'Server error' });
   }

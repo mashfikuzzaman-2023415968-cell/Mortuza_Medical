@@ -110,7 +110,7 @@ queries** (`$1, $2 …`) everywhere — never string-concatenate SQL; wrap multi
 
 **Application-layer table (add for Part II auth):** `app_user` (auth/roles, Section 4.17).
 
-**Schema additions for Part II features:** `patient.photo_url` (passport photo, Section 4.3), `token.status` now also allows `EXPIRED` (48-hour auto-expiry, Section 4.7), and the `token_request` table above (Section 4.20).
+**Schema additions for Part II features:** `patient.photo_url` (passport photo, Section 4.3), `patient.hall_name` (DU hall affiliation, Sections 4.3 & 10.2.8), `token.status` now also allows `EXPIRED` (48-hour auto-expiry, Section 4.7), and the `token_request` table above (Section 4.20). **Integrity hardening (Section 10.2.11):** CHECK constraints `chk_role_link` (`app_user`) and `chk_student_has_id` (`patient`), the partial unique index `uq_bed_active_admission` (`ward_admission`), and the `visit_token_patient_match` trigger (`visit`).
 
 ---
 
@@ -160,9 +160,11 @@ Data-type coverage across the schema (requirement #2): `SERIAL/INT`, `VARCHAR/CH
 | patient_category | VARCHAR(10) | NOT NULL, CHECK IN (STUDENT, TEACHER, STAFF, FAMILY) |
 | university_id | VARCHAR(20) | UNIQUE (NULL for family members) |
 | academic_dept | VARCHAR(60) | |
+| hall_name | VARCHAR(60) | Attached DU hall (students only); stored separately from `address` (Section 10.2.8) |
 | guardian_id | INT | FK → patient(patient_id) — set only when category = FAMILY |
 | registration_date | DATE | NOT NULL, DEFAULT CURRENT_DATE |
 | photo_url | VARCHAR(255) | Passport photo filename; uploaded by reception, served only through a JWT-guarded endpoint (a patient may fetch only their own) |
+| | | CHECK `chk_student_has_id` (patient_category <> 'STUDENT' OR university_id IS NOT NULL) — a student must have a University ID (Section 10.2.11) |
 
 ### 4.4 `health_card`
 | Column | Type | Constraints |
@@ -226,6 +228,10 @@ Data-type coverage across the schema (requirement #2): `SERIAL/INT`, `VARCHAR/CH
 | weight_kg | NUMERIC(5,2) | CHECK (weight_kg > 0) |
 | pulse | INT | |
 | follow_up_date | DATE | |
+
+> *Integrity trigger `visit_token_patient_match` (Part II):* a `BEFORE INSERT/UPDATE`
+> trigger ensures that when `token_id` is set, `patient_id` equals the token's patient
+> (`token → health_card → patient`) — a cross-table rule no FK can express (Section 10.2.11).
 
 ### 4.9 `prescription`
 | Column | Type | Constraints |
@@ -327,6 +333,10 @@ Data-type coverage across the schema (requirement #2): `SERIAL/INT`, `VARCHAR/CH
 | disease | VARCHAR(60) | |
 | status | VARCHAR(12) | NOT NULL, DEFAULT 'ADMITTED', CHECK IN (ADMITTED, DISCHARGED) |
 
+> *Partial unique index `uq_bed_active_admission` (Part II):* `UNIQUE (bed_id) WHERE
+> status = 'ADMITTED'` — at most one admitted patient per bed at a time, while
+> discharged history is retained (Section 10.2.11).
+
 ### 4.17 `app_user` (Part II auth — application layer)
 | Column | Type | Constraints |
 |---|---|---|
@@ -341,6 +351,7 @@ Data-type coverage across the schema (requirement #2): `SERIAL/INT`, `VARCHAR/CH
 | email_verified | BOOLEAN | NOT NULL, DEFAULT FALSE — must be TRUE before login is allowed |
 | is_active | BOOLEAN | DEFAULT TRUE |
 | created_at | TIMESTAMP | NOT NULL, DEFAULT CURRENT_TIMESTAMP |
+| | | CHECK `chk_role_link`: DOCTOR ⇒ doctor_id only; PATIENT ⇒ patient_id only; staff roles ⇒ neither (Section 10.2.11) |
 
 ### 4.18 `ambulance`
 | Column | Type | Constraints |
@@ -436,9 +447,12 @@ CREATE TABLE patient (
                     CHECK (patient_category IN ('STUDENT','TEACHER','STAFF','FAMILY')),
   university_id     VARCHAR(20) UNIQUE,
   academic_dept     VARCHAR(60),
+  hall_name         VARCHAR(60),            -- attached DU hall (students); stored separately from address
   guardian_id       INT REFERENCES patient(patient_id),
   registration_date DATE NOT NULL DEFAULT CURRENT_DATE,
-  photo_url         VARCHAR(255)            -- passport photo filename (uploaded by reception; served via JWT-guarded endpoint)
+  photo_url         VARCHAR(255),           -- passport photo filename (uploaded by reception; served via JWT-guarded endpoint)
+  -- A student is identified by their university ID, so it must be present.
+  CONSTRAINT chk_student_has_id CHECK (patient_category <> 'STUDENT' OR university_id IS NOT NULL)
 );
 
 CREATE TABLE health_card (
@@ -498,6 +512,29 @@ CREATE TABLE visit (
   pulse          INT,
   follow_up_date DATE
 );
+
+-- A visit attached to a token must belong to that token's patient. A foreign key
+-- cannot express this cross-table rule, so a BEFORE trigger enforces it.
+CREATE OR REPLACE FUNCTION trg_visit_token_patient_match() RETURNS trigger AS $$
+DECLARE
+  tok_patient INT;
+BEGIN
+  IF NEW.token_id IS NOT NULL THEN
+    SELECT hc.patient_id INTO tok_patient
+    FROM token t JOIN health_card hc ON hc.card_id = t.health_card_id
+    WHERE t.token_id = NEW.token_id;
+    IF tok_patient IS NOT NULL AND tok_patient <> NEW.patient_id THEN
+      RAISE EXCEPTION 'Visit patient does not match the token''s patient'
+        USING ERRCODE = '23514', CONSTRAINT = 'visit_token_patient_match';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER visit_token_patient_match
+  BEFORE INSERT OR UPDATE ON visit
+  FOR EACH ROW EXECUTE FUNCTION trg_visit_token_patient_match();
 
 CREATE TABLE prescription (
   prescription_id   SERIAL PRIMARY KEY,
@@ -591,6 +628,11 @@ CREATE TABLE ward_admission (
   CHECK (discharge_datetime IS NULL OR discharge_datetime > admit_datetime)
 );
 
+-- A bed can hold at most one ADMITTED patient at a time (discharged rows are
+-- kept for history, so this is a partial unique index rather than a constraint).
+CREATE UNIQUE INDEX uq_bed_active_admission
+  ON ward_admission (bed_id) WHERE status = 'ADMITTED';
+
 CREATE TABLE ambulance (
   ambulance_id    SERIAL PRIMARY KEY,
   registration_no VARCHAR(30) NOT NULL UNIQUE,
@@ -632,7 +674,14 @@ CREATE TABLE app_user (
   verification_token VARCHAR(100),
   email_verified     BOOLEAN NOT NULL DEFAULT FALSE,
   is_active          BOOLEAN DEFAULT TRUE,
-  created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  -- A login's role must match its linked record: DOCTOR -> doctor_id only,
+  -- PATIENT -> patient_id only, and pure-staff roles link to neither.
+  CONSTRAINT chk_role_link CHECK (
+    (role = 'DOCTOR'  AND doctor_id IS NOT NULL AND patient_id IS NULL) OR
+    (role = 'PATIENT' AND patient_id IS NOT NULL AND doctor_id IS NULL) OR
+    (role IN ('ADMIN','RECEPTIONIST','PHARMACIST','LAB_TECH') AND doctor_id IS NULL AND patient_id IS NULL)
+  )
 );
 
 -- Online token request (Part II feature). Created AFTER app_user because
@@ -691,6 +740,8 @@ Populate realistic volumes so aggregates and `HAVING` are meaningful:
   is reset with `setval` after the explicit-id inserts).
 - **patient.photo_url (Part II):** populated for patients whose passport photo has been uploaded
   by reception; uploaded image files live under `server/uploads/patients/` (UUID filenames), not in the DB.
+- **patient.hall_name (Part II):** set for STUDENT rows (the attached DU hall); blank for
+  TEACHER/STAFF/FAMILY. Backfilled from `address` for students whose address named a hall.
 
 ---
 
@@ -787,6 +838,23 @@ another → BCNF.
 > table referenced by FK, never duplicated into `visit`/`token`/`prescription`. Combined with the
 > three removals above, that is what keeps the whole schema in BCNF rather than collapsing into an
 > update-anomaly-prone "one big table."
+
+**Dependency preservation (and why there is no BCNF/3NF trade-off here).** BCNF guarantees a
+lossless-join decomposition but *not*, in general, dependency preservation — that can fail when a
+decomposition splits an FD's determinant across two relations. It does **not** fail here: every
+relation keeps its candidate key(s) — the surrogate PK *and* the natural key as a `UNIQUE`
+(including the composite keys of `token`, `duty_roster`, `medicine`, `prescription_item`) —
+**within the same table**. So every non-trivial FD is of the form *candidate-key → attributes* and
+is enforced locally by a single PK/UNIQUE; cross-table FDs ride on foreign keys whose determinant
+(the parent PK) lives in the parent table. The union of the projected FDs therefore equals the
+original set: the schema is simultaneously **lossless-join, BCNF, and dependency-preserving**.
+
+> *Integrity beyond normalization (Part II, Section 10.2.11):* a few invariants are not functional
+> dependencies and so are enforced by explicit constraints/trigger rather than by the schema's
+> normal form — `chk_role_link`, `chk_student_has_id`, `uq_bed_active_admission`, and the
+> `visit_token_patient_match` trigger. Note also that `token_date` was deliberately **not** turned
+> into a generated column: it is the appointment date (can be future-dated via an approved token
+> request), so it is genuinely independent of `issue_datetime`, not a redundancy.
 
 ---
 
@@ -1295,6 +1363,14 @@ async function sendVerificationEmail(email, token) {
 6. Call `sendVerificationEmail(email, token)`.
 7. Return `201 { success: true, message: "Account created. Check your email to verify." }`.
 
+> **Role-specific onboarding (Part II, Section 10.2.9):** DOCTOR self-applications create the
+> `doctor` record + linked login in one transaction (admin assigns the unit at approval); PATIENT
+> self-registration looks the patient up by University ID / health-card number and sends the
+> verification link to the **email on file** (never a typed one); the admin Users form links logins
+> via **unlinked-record dropdowns**. The `JWT_SECRET`/`JWT_EXPIRES_IN` fail-fast guard is in
+> Section 10.2.10, and `chk_role_link` keeps every login's role consistent with its link
+> (Section 10.2.11).
+
 **C. Email verification endpoint (`GET /api/auth/verify-email?token=...`):**
 1. Server queries: `SELECT user_id FROM app_user WHERE verification_token = $1 AND email_verified = FALSE`.
 2. If no row → `400 { error: "Invalid or expired verification link" }`.
@@ -1738,6 +1814,83 @@ and `Friday Afternoon` (15:30–20:30); the `shift` table structure is unchanged
 - **Gender grouping:** pill filters (All/Male/Female) on the admin roster table,
   the availability component, and the doctor directory (`DoctorsReadOnly`). The
   doctors-list endpoint now also returns the non-sensitive `gender` field.
+
+### 10.2.8 Patient hall name (DU hall affiliation)
+- **Schema:** new column **`patient.hall_name VARCHAR(60)`** (Section 4.3) — the DU
+  hall a student is attached to, stored **separately from `address`**. A student
+  living in hall has both a hall and (optionally) a home address; a student living
+  off-campus still has an attached hall. Blank for TEACHER/STAFF/FAMILY.
+- **BCNF:** `hall_name` depends only on `patient_id` (the PK), so it is a plain base
+  attribute and the table stays in BCNF — no new functional dependency is introduced.
+- **Backend (`routes/patients.js`):** `POST`/`PUT` accept `hall_name` but persist it
+  **only when `patient_category = 'STUDENT'`** (forced to `NULL` otherwise); the
+  list/detail SELECTs return it.
+- **Frontend:** the reception register/edit form shows a "Hall name" field for
+  students; the patient profile/health-card views display it.
+
+### 10.2.9 Account onboarding & patient identity binding
+Three onboarding paths, all converging on the `app_user` ⇄ `doctor`/`patient` links.
+
+- **Doctor self-application (`POST /api/auth/register`, `role=DOCTOR`):** creates the
+  clinical `doctor` record **and** its linked `app_user` in **one transaction**
+  (`unit_id` left NULL, `email_verified=FALSE`, `is_active=FALSE`). The applicant
+  supplies professional details (full name, BMDC reg no, doctor type, specialization,
+  designation, gender, phone, part-time); uniqueness of username/email/BMDC is
+  pre-checked and the `23505` race is caught. After email verification an admin
+  reviews the application, **assigns the unit at approval** (`PUT /api/users/:id/approve`
+  accepts an optional `unit_id` → updates `doctor.unit_id` then activates), and a
+  rejection (`PUT /:id/reject`) deletes the orphaned `doctor` record.
+- **Admin-driven account creation (`POST /api/users`):** the admin Users form links a
+  login to an existing record through a **dropdown, never a raw ID lookup** —
+  `GET /api/doctors?unlinked=true` and `GET /api/patients?unlinked=true`
+  (`NOT EXISTS` an `app_user` already linked) populate "Link to doctor / patient"
+  pickers. The link is **bound strictly to the role** server-side (a DOCTOR carries
+  only `doctor_id`, a PATIENT only `patient_id`, staff neither), so the row always
+  satisfies `chk_role_link` (Section 10.2.11) regardless of stray IDs in the body.
+- **Patient self-registration identity binding (Option B):** a patient registers with
+  their **University ID or Health Card number** (no typed email). The verification
+  link is sent to the **email already on file** for the matched `patient` record —
+  *never* a user-supplied address — so knowing the (printed) ID is not enough; the
+  applicant must control the registered inbox. If the record has **no email on file**,
+  registration is refused with a message to visit reception. The stored `app_user.email`
+  is the on-file address; any `email` in the request body is ignored for patients.
+
+### 10.2.10 JWT configuration hardening
+- **Fail-fast startup guard (`src/index.js`):** the server **aborts at boot**
+  (`process.exit(1)`) if `JWT_SECRET` is missing or shorter than 32 characters —
+  preventing both unverifiable 500s at login time and trivially-forgeable tokens.
+- **Default token lifetime:** if `JWT_EXPIRES_IN` is unset it defaults to `24h`, so an
+  empty value can never mean "tokens never expire."
+
+### 10.2.11 Database integrity hardening (constraints + trigger)
+Invariants that foreign keys alone cannot express are now enforced **in the database**,
+with the app producing compliant rows and translating any violation into a friendly
+4xx instead of a 500.
+
+- **`chk_role_link` (CHECK on `app_user`):** a login's role must match its link —
+  `DOCTOR`→`doctor_id` only, `PATIENT`→`patient_id` only, pure-staff roles
+  (`ADMIN`/`RECEPTIONIST`/`PHARMACIST`/`LAB_TECH`)→neither. (Three pre-existing
+  orphan logins from the earlier broken self-signup were cleaned up before adding it.)
+- **`uq_bed_active_admission` (partial unique index on `ward_admission`):**
+  `UNIQUE (bed_id) WHERE status = 'ADMITTED'` — a bed can hold at most one admitted
+  patient at a time, while discharged rows are kept for history. Catches the
+  concurrency race two admissions could otherwise win.
+- **`chk_student_has_id` (CHECK on `patient`):** a `STUDENT` must carry a
+  `university_id` (mirrors the app-layer rule that already requires it).
+- **`visit_token_patient_match` (BEFORE INSERT/UPDATE trigger on `visit`):** a visit
+  attached to a token must belong to **that token's patient** (resolved via
+  `token → health_card → patient`) — a cross-table rule no FK can state.
+- **Design decision — `token_date` is NOT a generated column.** It was considered
+  (to remove an apparent `issue_datetime → token_date` redundancy) and **rejected**:
+  an approved online request issues a token for a **future `preferred_date`**, so
+  `token_date` is the *appointment date*, genuinely independent of `issue_datetime`.
+  Generating it would have broken future-dated tokens and the per-day token counter.
+- **Dependency preservation:** every relation keeps its candidate key(s) — surrogate
+  PK plus the natural key as a `UNIQUE` — **within the same table**, so each FD is
+  enforced locally and no determinant is split across relations. The decomposition is
+  therefore **lossless-join, BCNF, *and* dependency-preserving**, avoiding the usual
+  BCNF/3NF trade-off. The constraints/trigger above are integrity enforcement, not
+  normalization changes.
 
 ---
 
