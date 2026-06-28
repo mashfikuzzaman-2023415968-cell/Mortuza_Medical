@@ -116,23 +116,46 @@ INSERT INTO shift (shift_id, shift_name, start_time, end_time) VALUES
  (4,'Friday Morning','08:30','12:30'),
  (5,'Friday Afternoon','15:30','20:30');
 
--- ---------- 6. DUTY_ROSTER (sample week 04-08 Jan 2026, Sun-Thu) ----------
-INSERT INTO duty_roster (roster_id, doctor_id, shift_id, unit_id, duty_date, is_oncall) VALUES
- (1 ,6 ,1,2,'2026-01-04',FALSE),
- (2 ,2 ,1,2,'2026-01-04',FALSE),
- (3 ,4 ,1,1,'2026-01-04',FALSE),
- (4 ,13,2,2,'2026-01-04',FALSE),
- (5 ,11,2,1,'2026-01-04',FALSE),
- (6 ,7 ,3,1,'2026-01-04',TRUE),
- (7 ,20,1,3,'2026-01-05',FALSE),
- (8 ,22,1,4,'2026-01-05',FALSE),
- (9 ,3 ,1,1,'2026-01-05',FALSE),
- (10,18,2,2,'2026-01-05',FALSE),
- (11,3 ,3,1,'2026-01-05',TRUE),
- (12,25,1,1,'2026-01-05',FALSE),  -- ENT specialist (Mon)
- (13,21,1,3,'2026-01-06',FALSE),
- (14,26,1,1,'2026-01-07',FALSE),  -- Cardiology (Wed)
- (15,27,1,8,'2026-01-06',FALSE);  -- USG (Tue)
+-- ---------- 6. DUTY_ROSTER ----------
+-- Generated RELATIVE to CURRENT_DATE so the "doctors available now" feature and
+-- the Friday shifts always have live data on any clone/deploy, on any day it is
+-- loaded. roster_id is left to SERIAL. (M=1,4,7,8,9,10,11,12,14 · F=2,6,13)
+--
+-- (a) Current week, Sunday–Thursday (offsets 0..4 from this week's Sunday).
+INSERT INTO duty_roster (doctor_id, shift_id, unit_id, duty_date, is_oncall)
+SELECT v.doctor_id, v.shift_id, v.unit_id,
+       CURRENT_DATE - EXTRACT(DOW FROM CURRENT_DATE)::int + v.day_off,
+       v.is_oncall
+FROM (VALUES
+  (1 ,1,1,0,FALSE),(6 ,1,2,0,FALSE),(4 ,2,1,0,FALSE),(13,2,2,0,FALSE),(10,3,1,0,TRUE ),  -- Sun
+  (3 ,1,1,1,FALSE),(2 ,1,2,1,FALSE),(5 ,2,1,1,FALSE),(9 ,3,1,1,FALSE),                    -- Mon
+  (8 ,1,1,2,FALSE),(13,1,2,2,FALSE),(7 ,2,1,2,FALSE),(11,3,1,2,TRUE ),                    -- Tue
+  (1 ,1,1,3,FALSE),(6 ,2,2,3,FALSE),(12,2,1,3,FALSE),(14,3,1,3,FALSE),                    -- Wed
+  (4 ,1,1,4,FALSE),(2 ,1,2,4,FALSE),(9 ,2,1,4,FALSE),(10,3,1,4,FALSE)                     -- Thu
+) AS v(doctor_id, shift_id, unit_id, day_off, is_oncall)
+ON CONFLICT (doctor_id, duty_date, shift_id) DO NOTHING;
+
+-- (b) Upcoming Friday (or today, if today is Friday) — uses the Friday shifts.
+INSERT INTO duty_roster (doctor_id, shift_id, unit_id, duty_date, is_oncall)
+SELECT v.doctor_id, v.shift_id, v.unit_id,
+       CURRENT_DATE + ((5 - EXTRACT(DOW FROM CURRENT_DATE)::int + 7) % 7)::int,
+       v.is_oncall
+FROM (VALUES
+  (1 ,4,1,FALSE),(6 ,4,2,FALSE),   -- Friday Morning
+  (4 ,5,1,FALSE),(13,5,2,FALSE),   -- Friday Afternoon
+  (10,3,1,TRUE )                   -- Night (overnight cover, on-call)
+) AS v(doctor_id, shift_id, unit_id, is_oncall)
+ON CONFLICT (doctor_id, duty_date, shift_id) DO NOTHING;
+
+-- (c) Guarantee TODAY has full Morning+Afternoon+Night coverage + an on-call, so
+--     "available now" returns doctors at any hour on the demo day (any weekday).
+INSERT INTO duty_roster (doctor_id, shift_id, unit_id, duty_date, is_oncall)
+VALUES
+  (1 ,1,1,CURRENT_DATE,FALSE),(6 ,1,2,CURRENT_DATE,FALSE),   -- Morning (M+F)
+  (4 ,2,1,CURRENT_DATE,FALSE),(2 ,2,2,CURRENT_DATE,FALSE),   -- Afternoon (M+F)
+  (10,3,1,CURRENT_DATE,FALSE),(13,3,2,CURRENT_DATE,FALSE),   -- Night (M+F)
+  (7 ,1,1,CURRENT_DATE,TRUE )                                -- on-call today
+ON CONFLICT (doctor_id, duty_date, shift_id) DO NOTHING;
 
 -- ---------- 7. TOKEN (patient derived via health_card) ----------
 INSERT INTO token (token_id, token_number, health_card_id, unit_id, issue_datetime, token_date, status) VALUES

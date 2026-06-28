@@ -5,3 +5,6 @@ dist/
 
 # Runtime-uploaded files (patient photos); dir is auto-created by the server
 server/uploads/
+
+# Generated database export (regenerate locally; not version-controlled)
+MDC_database_export.pdf
