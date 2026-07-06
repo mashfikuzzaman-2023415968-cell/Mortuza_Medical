@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Search, UserPlus, Pencil, X, Loader2, Camera, ImageOff } from 'lucide-react';
 import api from '../../api/axios';
+import { EmptyState, SkeletonRows } from '../../components/ui';
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const CATEGORIES = ['STUDENT', 'TEACHER', 'STAFF', 'FAMILY'];
@@ -411,11 +412,9 @@ export default function PatientsPage() {
         {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
 
         {loading ? (
-          <div className="flex items-center gap-2 text-sm text-gray-400 py-4">
-            <Loader2 size={16} className="animate-spin" /> Loading…
-          </div>
+          <SkeletonRows rows={4} />
         ) : patients.length === 0 ? (
-          <p className="text-sm text-gray-400 py-2">No patients found.</p>
+          <EmptyState title="No patients found" hint="Register a patient with the form above — they appear here instantly." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

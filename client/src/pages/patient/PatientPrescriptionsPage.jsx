@@ -1,11 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Loader2, ClipboardList, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Loader2, ClipboardList, ChevronRight, ArrowLeft, Printer } from 'lucide-react';
 import api from '../../api/axios';
+import PrescriptionPrintModal from '../../components/PrescriptionPrintModal';
 
 function PrescriptionDetail({ prescriptionId, onBack }) {
   const [rx, setRx] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showPrint, setShowPrint] = useState(false);
 
   useEffect(() => {
     api
@@ -32,15 +34,26 @@ function PrescriptionDetail({ prescriptionId, onBack }) {
       <button onClick={onBack} className="inline-flex items-center gap-1 text-sm text-sky-600 hover:underline"><ArrowLeft size={14} /> Back to prescriptions</button>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <ClipboardList size={18} className="text-sky-500" />
-          <h3 className="text-lg font-semibold text-gray-800">
-            Prescription #{rx.prescription_id}
-            <span className="ml-2 text-sm font-normal text-gray-400">
-              · {rx.prescription_date ? new Date(rx.prescription_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
-            </span>
-          </h3>
+        <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <ClipboardList size={18} className="text-sky-500" />
+            <h3 className="text-lg font-semibold text-gray-800">
+              Prescription #{rx.prescription_id}
+              <span className="ml-2 text-sm font-normal text-gray-400">
+                · {rx.prescription_date ? new Date(rx.prescription_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+              </span>
+            </h3>
+          </div>
+          <button
+            onClick={() => setShowPrint(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-teal-700"
+          >
+            <Printer size={13} /> Print
+          </button>
         </div>
+        {showPrint && (
+          <PrescriptionPrintModal prescriptionId={rx.prescription_id} onClose={() => setShowPrint(false)} />
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-600 mb-4">
           <div><span className="text-gray-400">Doctor:</span> <span className="font-medium text-gray-700">{rx.doctor_name}</span></div>
           <div><span className="text-gray-400">Date:</span> {rx.prescription_date?.slice(0, 10) || '—'}</div>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, Loader2, FlaskConical, CheckCircle2 } from 'lucide-react';
 import api from '../../api/axios';
+import { useToast } from '../../components/toast';
 
 const STATUS_STYLES = {
   ORDERED: 'bg-amber-100 text-amber-700',
@@ -10,6 +11,7 @@ const STATUS_STYLES = {
 };
 
 export default function TestResultForm({ orderId, onBack, onUpdated }) {
+  const toast = useToast();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState('');
@@ -72,6 +74,7 @@ export default function TestResultForm({ orderId, onBack, onUpdated }) {
       }
 
       await api.put(`/test-orders/${orderId}/result`, payload);
+      toast.success('Result recorded — the patient can now see it.');
       setSuccess(status === 'COMPLETED' ? 'Result entered and test marked completed.' : 'Sample collected — status updated.');
       if (onUpdated) onUpdated();
       load();

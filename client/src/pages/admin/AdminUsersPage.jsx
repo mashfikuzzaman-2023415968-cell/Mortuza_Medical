@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Loader2, Plus, CheckCircle2, XCircle, Users, RefreshCw } from 'lucide-react';
 import api from '../../api/axios';
+import { useToast } from '../../components/toast';
+import ConfirmDialog from '../../components/ConfirmDialog';
 
 const VALID_ROLES = ['ADMIN', 'DOCTOR', 'RECEPTIONIST', 'PHARMACIST', 'LAB_TECH', 'PATIENT'];
 const ROLE_STYLES = {
@@ -15,6 +17,7 @@ const ROLE_STYLES = {
 const EMPTY_FORM = { username: '', password: '', email: '', role: 'RECEPTIONIST', doctor_id: '', patient_id: '' };
 
 export default function AdminUsersPage() {
+  const toast = useToast();
   const [users, setUsers] = useState([]);
   const [unlinkedDoctors, setUnlinkedDoctors] = useState([]);
   const [unlinkedPatients, setUnlinkedPatients] = useState([]);
@@ -68,6 +71,7 @@ export default function AdminUsersPage() {
     try {
       const payload = { ...form, doctor_id: form.doctor_id ? Number(form.doctor_id) : undefined, patient_id: form.patient_id ? Number(form.patient_id) : undefined };
       await api.post('/users', payload);
+      toast.success('User account created.');
       setShowForm(false);
       setForm(EMPTY_FORM);
       load();
@@ -86,27 +90,52 @@ export default function AdminUsersPage() {
     finally { setActioningId(null); }
   };
 
-  const handleReject = async (id) => {
-    if (!window.confirm('Reject and delete this user account?')) return;
-    setActioningId(id);
-    try { await api.put(`/users/${id}/reject`); load(); }
-    catch (err) { alert(err.response?.data?.error || 'Reject failed.'); }
-    finally { setActioningId(null); }
-  };
+  const [confirmReq, setConfirmReq] = useState(null);
 
-  const handleToggleActive = async (id, currentlyActive) => {
-    const action = currentlyActive ? 'Deactivate' : 'Activate';
-    if (!window.confirm(`${action} this user account?`)) return;
+  const doReject = async (id) => {
     setActioningId(id);
-    try { await api.put(`/users/${id}`, { is_active: !currentlyActive }); load(); }
-    catch (err) { alert(err.response?.data?.error || `${action} failed.`); }
+    try { await api.put(`/users/${id}/reject`); load(); toast.success('Account rejected and removed.'); }
+    catch (err) { toast.error(err.response?.data?.error || 'Reject failed.'); }
     finally { setActioningId(null); }
   };
+  const handleReject = (id) => setConfirmReq({
+    title: 'Reject and delete this account?',
+    message: 'The login is removed permanently. A doctor application also loses its submitted profile.',
+    label: 'Reject', run: () => doReject(id),
+  });
+
+  const doToggleActive = async (id, currentlyActive) => {
+    const action = currentlyActive ? 'Deactivate' : 'Activate';
+    setActioningId(id);
+    try { await api.put(`/users/${id}`, { is_active: !currentlyActive }); load(); toast.success(`Account ${currentlyActive ? 'deactivated' : 'activated'}.`); }
+    catch (err) { toast.error(err.response?.data?.error || `${action} failed.`); }
+    finally { setActioningId(null); }
+  };
+  const handleToggleActive = (id, currentlyActive) => setConfirmReq({
+    title: `${currentlyActive ? 'Deactivate' : 'Activate'} this account?`,
+    message: currentlyActive
+      ? 'They will be blocked from signing in until reactivated.'
+      : 'They will be able to sign in again.',
+    label: currentlyActive ? 'Deactivate' : 'Activate',
+    tone: currentlyActive ? 'rose' : 'amber',
+    run: () => doToggleActive(id, currentlyActive),
+  });
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   return (
     <div className="space-y-4">
+      {confirmReq && (
+        <ConfirmDialog
+          open
+          title={confirmReq.title}
+          message={confirmReq.message}
+          confirmLabel={confirmReq.label}
+          tone={confirmReq.tone || 'rose'}
+          onConfirm={async () => { await confirmReq.run(); setConfirmReq(null); }}
+          onClose={() => setConfirmReq(null)}
+        />
+      )}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-xl font-semibold text-gray-800">User accounts</h2>
         <div className="flex gap-2">

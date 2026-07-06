@@ -4,23 +4,35 @@
 @variant dark (&:where(.dark, .dark *));
 
 /* ─────────────────────────────────────────────
+   BRAND TYPOGRAPHY
+   Inter for body copy; Space Grotesk gives titles,
+   stat numbers and the brand mark a distinct voice
+   (matches the landing page).
+   ───────────────────────────────────────────── */
+body { font-family: 'Inter', system-ui, sans-serif; }
+h1, h2, h3, .font-display { font-family: 'Space Grotesk', 'Inter', sans-serif; }
+
+/* Brand gradient — the single "primary" accent (same as the landing CTA) */
+.brand-gradient { background-image: linear-gradient(90deg, #2563eb, #0d9488); }
+
+/* ─────────────────────────────────────────────
    DARK MODE OVERRIDES
    Sit outside @layer so they outrank Tailwind's
    layered utilities without needing !important.
    ───────────────────────────────────────────── */
 
 /* ---------------------------------------------------------------
-   Calm "soft slate" dark palette.
-   Layered neutral surfaces (page < card < raised) with gentle,
-   slightly-warm separation, and a soft off-white primary text
-   (#cdd9e5) instead of harsh pure white to avoid halation/eye-strain.
+   Calm "deep teal" dark palette (matches the landing page family).
+   Layered teal-tinted surfaces (page < card < raised) with gentle
+   separation, and a soft off-white primary text (#cdd9e5) instead
+   of harsh pure white to avoid halation/eye-strain.
    --------------------------------------------------------------- */
 
 /* Surfaces — page is the deepest, cards sit one step above it */
-.dark .bg-white       { background-color: #20252e; }  /* cards, popovers, modals */
-.dark .bg-gray-50     { background-color: #161a21; }  /* app / page background */
-.dark .bg-gray-100    { background-color: #2a313b; }  /* chips, subtle fills */
-.dark .bg-gray-200    { background-color: #353d48; }  /* raised fills, track */
+.dark .bg-white       { background-color: #16232a; }  /* cards, popovers, modals */
+.dark .bg-gray-50     { background-color: #0e181d; }  /* app / page background */
+.dark .bg-gray-100    { background-color: #1e2f37; }  /* chips, subtle fills */
+.dark .bg-gray-200    { background-color: #293c45; }  /* raised fills, track */
 
 /* Text — soft, never pure white; secondary tones stay readable */
 .dark .text-gray-900  { color: #cdd9e5; }
@@ -32,17 +44,17 @@
 .dark .text-gray-300  { color: #4e5660; }
 
 /* Borders — quiet separation, visible but not contrasty */
-.dark .border-gray-50  { border-color: #20252e; }
-.dark .border-gray-100 { border-color: #2b323c; }
-.dark .border-gray-200 { border-color: #363e49; }
+.dark .border-gray-50  { border-color: #16232a; }
+.dark .border-gray-100 { border-color: #24363f; }
+.dark .border-gray-200 { border-color: #2e434d; }
 
 /* Table / list dividers */
-.dark .divide-gray-50  > * + * { border-color: #262d36; }
-.dark .divide-gray-100 > * + * { border-color: #313842; }
+.dark .divide-gray-50  > * + * { border-color: #1c2c33; }
+.dark .divide-gray-100 > * + * { border-color: #253841; }
 
 /* Hover states */
-.dark .hover\:bg-gray-50:hover  { background-color: #262d36; }
-.dark .hover\:bg-gray-100:hover { background-color: #313842; }
+.dark .hover\:bg-gray-50:hover  { background-color: #1b2b32; }
+.dark .hover\:bg-gray-100:hover { background-color: #24363f; }
 
 /* Coloured status badges — tinted dark surface + soft light text,
    tuned to sit harmoniously on the new card colour */
@@ -96,32 +108,32 @@
 }
 
 /* Login page gradient — calm, low-saturation backdrop */
-.dark .from-slate-50 { --tw-gradient-from: #14181f; }
-.dark .via-sky-50    { --tw-gradient-via:  #161b23; }
-.dark .to-teal-50    { --tw-gradient-to:   #121b1b; }
+.dark .from-slate-50 { --tw-gradient-from: #10191e; }
+.dark .via-sky-50    { --tw-gradient-via:  #101c21; }
+.dark .to-teal-50    { --tw-gradient-to:   #0e1b1a; }
 
 /* Form controls — inputs sit slightly darker than the card for an inset feel */
 .dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
 .dark textarea,
 .dark select {
-  background-color: #181d25;
+  background-color: #101c22;
   color: #cdd9e5;
-  border-color: #363e49;
+  border-color: #2e434d;
 }
 
 .dark input:focus:not([type="checkbox"]):not([type="radio"]),
 .dark textarea:focus,
 .dark select:focus {
-  border-color: #4a5563;
+  border-color: #3f5761;
 }
 
 .dark input::placeholder,
 .dark textarea::placeholder { color: #69727f; }
 
 /* Scrollbar (subtle) */
-.dark ::-webkit-scrollbar-track { background: #161a21; }
-.dark ::-webkit-scrollbar-thumb { background: #353d48; border-radius: 4px; }
-.dark ::-webkit-scrollbar-thumb:hover { background: #454d58; }
+.dark ::-webkit-scrollbar-track { background: #0e181d; }
+.dark ::-webkit-scrollbar-thumb { background: #293c45; border-radius: 4px; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #354c56; }
 
 /* Photo zoom animations */
 @keyframes fadeIn {
@@ -147,4 +159,81 @@
 .dark .signout-btn:hover {
   background-color: #ef4444;   /* red-500 — brighter than the muted shared hover */
   color: #ffffff;
+}
+
+/* ─────────────────────────────────────────────
+   MICRO-INTERACTIONS (global)
+   ───────────────────────────────────────────── */
+
+/* Content fades up gently on every page/nav change (key={nav} re-mounts it) */
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-enter { animation: pageEnter 0.22s ease both; }
+
+/* Skeleton shimmer for loading states */
+.skeleton {
+  position: relative; overflow: hidden;
+  background: #e9edf1; border-radius: 8px; color: transparent;
+}
+.dark .skeleton { background: #1e2f37; }
+.skeleton::after {
+  content: ''; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+  animation: shimmer 1.4s infinite;
+}
+.dark .skeleton::after {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.07), transparent);
+}
+@keyframes shimmer { 100% { transform: translateX(100%); } }
+
+/* Data-table rows: quiet hover highlight everywhere, for free */
+table tbody tr { transition: background-color 0.15s ease; }
+table tbody tr:hover { background-color: #f8fafc; }
+.dark table tbody tr:hover { background-color: #1b2b32; }
+
+/* Timeline dots sit on the card, so their "cutout" ring must match it */
+.dark .ring-white { --tw-ring-color: #16232a; }
+
+/* Toast entry */
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Keyboard accessibility: visible brand-teal focus ring on buttons/links when
+   tabbing (input fields keep their role-tinted rings). */
+button:focus-visible, a:focus-visible {
+  outline: 2px solid #14b8a6;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* Mobile: wide data tables scroll sideways inside their card instead of
+   squashing or overflowing the page. */
+@media (max-width: 767px) {
+  table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter, .skeleton::after { animation: none !important; }
+}
+
+/* Printing: browsers freeze CSS animations at their FIRST keyframe, so the
+   page-enter fade (from opacity:0) would print everything blank — including
+   the token card, which prints from inside the page content. Kill all entry
+   animation state in print. */
+@media print {
+  .page-enter {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  /* Descendants keep their own transforms (e.g. the token card's centering),
+     but never inherit frozen entry-animation state. */
+  .page-enter * {
+    animation: none !important;
+    opacity: 1 !important;
+  }
 }

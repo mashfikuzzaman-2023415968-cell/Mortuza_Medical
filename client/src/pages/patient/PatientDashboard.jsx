@@ -4,6 +4,7 @@ import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import { usePatientPhoto } from '../../hooks/usePatientPhoto';
 import TokenCardModal from '../../components/TokenCardModal';
+import { StatCard, AttentionRow } from '../../components/ui';
 
 const CARD_STATUS_STYLES = {
   ACTIVE: { icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50', label: 'Active' },
@@ -17,23 +18,6 @@ const CATEGORY_COLORS = {
   STAFF: 'bg-amber-100 text-amber-700',
   FAMILY: 'bg-rose-100 text-rose-700',
 };
-
-function StatCard({ icon: Icon, color, label, value, onClick }) {
-  return (
-    <div
-      onClick={onClick}
-      className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4 ${onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
-    >
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${color}`}>
-        <Icon size={20} />
-      </div>
-      <div>
-        <p className="text-xs text-gray-400">{label}</p>
-        <p className="text-xl font-semibold text-gray-800">{value ?? '—'}</p>
-      </div>
-    </div>
-  );
-}
 
 export default function PatientDashboard({ onNavChange }) {
   const { user } = useAuth();
@@ -82,9 +66,31 @@ export default function PatientDashboard({ onNavChange }) {
   }, []);
 
   const cardMeta = card ? CARD_STATUS_STYLES[card.status] || CARD_STATUS_STYLES.ACTIVE : null;
+  const cardDays = card ? Math.ceil((new Date(card.expiry_date) - new Date()) / 86400000) : null;
 
   return (
     <div className="space-y-6">
+      {!loading && (
+        <AttentionRow
+          items={[
+            card && (card.status === 'EXPIRED' || cardDays < 0) && {
+              label: 'Your health card has expired — renew it at reception',
+              onClick: () => onNavChange('card'),
+              tone: 'rose',
+            },
+            card && card.status === 'ACTIVE' && cardDays >= 0 && cardDays <= 30 && {
+              label: `Health card expires in ${cardDays} day${cardDays === 1 ? '' : 's'}`,
+              onClick: () => onNavChange('card'),
+              tone: 'amber',
+            },
+            !card && {
+              label: 'No health card on record — visit reception to get one',
+              onClick: () => onNavChange('card'),
+              tone: 'rose',
+            },
+          ]}
+        />
+      )}
       {/* Profile banner */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex items-center gap-4">
         <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center overflow-hidden flex-shrink-0">

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, Fragment } from 'react';
 import { Loader2, Plus, Trash2, Pencil, Calendar, RefreshCw, Check, X, CalendarRange, AlertTriangle } from 'lucide-react';
 import api from '../../api/axios';
+import ConfirmDialog from '../../components/ConfirmDialog';
 
 const PILL = (active) =>
   `rounded-full px-3 py-1 text-xs font-medium transition-colors ${
@@ -144,8 +145,9 @@ export default function RosterPage() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Remove this roster entry?')) return;
+  const [confirmReq, setConfirmReq] = useState(null);
+
+  const doDelete = async (id) => {
     setDeletingId(id);
     try {
       await api.delete(`/roster/${id}`);
@@ -156,6 +158,11 @@ export default function RosterPage() {
       setDeletingId(null);
     }
   };
+  const handleDelete = (id) => setConfirmReq({
+    title: 'Remove this roster entry?',
+    message: 'The doctor will no longer show as on duty for this shift; the "available now" board updates immediately.',
+    label: 'Remove', run: () => doDelete(id),
+  });
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const setE = (k, v) => setEditForm((f) => ({ ...f, [k]: v }));
@@ -171,6 +178,17 @@ export default function RosterPage() {
 
   return (
     <div className="space-y-4">
+      {confirmReq && (
+        <ConfirmDialog
+          open
+          title={confirmReq.title}
+          message={confirmReq.message}
+          confirmLabel={confirmReq.label}
+          tone={confirmReq.tone || 'rose'}
+          onConfirm={async () => { await confirmReq.run(); setConfirmReq(null); }}
+          onClose={() => setConfirmReq(null)}
+        />
+      )}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-xl font-semibold text-gray-800">Duty roster</h2>
         <div className="flex items-center gap-2">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ClipboardList, Loader2, Pill } from 'lucide-react';
 import api from '../../api/axios';
+import { EmptyState, SkeletonRows } from '../../components/ui';
 import DispenseForm from './DispenseForm';
 
 export default function DispenseQueue() {
@@ -44,11 +45,9 @@ export default function DispenseQueue() {
       {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
 
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-gray-400 py-4">
-          <Loader2 size={16} className="animate-spin" /> Loading…
-        </div>
+        <SkeletonRows rows={4} />
       ) : prescriptions.length === 0 ? (
-        <p className="text-sm text-gray-400 py-2">No pending prescriptions to dispense.</p>
+        <EmptyState title="All caught up" hint="New prescriptions from doctors will land here, ready to dispense." />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

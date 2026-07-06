@@ -1,11 +1,19 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Loader2, Stethoscope, ChevronRight, ArrowLeft, FlaskConical, ClipboardList } from 'lucide-react';
 import api from '../../api/axios';
+import { EmptyState, SkeletonRows, timeAgo } from '../../components/ui';
 
 const VISIT_TYPE_STYLES = {
   NEW: 'bg-sky-100 text-sky-700',
   FOLLOWUP: 'bg-violet-100 text-violet-700',
   EMERGENCY: 'bg-red-100 text-red-700',
+};
+
+/* Timeline dot colors by visit type */
+const VISIT_TYPE_DOTS = {
+  NEW: 'bg-sky-500',
+  FOLLOWUP: 'bg-violet-500',
+  EMERGENCY: 'bg-rose-500',
 };
 
 function VisitDetail({ visitId, onBack }) {
@@ -169,38 +177,49 @@ export default function PatientVisitsPage() {
       <h2 className="text-xl font-semibold text-gray-800">My visits</h2>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-gray-400 py-8"><Loader2 size={16} className="animate-spin" /> Loading…</div>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6"><SkeletonRows rows={4} /></div>
       ) : error ? (
         <p className="text-sm text-red-600">{error}</p>
       ) : visits.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center text-sm text-gray-400">No visits on record.</div>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+          <EmptyState
+            icon={Stethoscope}
+            title="No visits on record yet"
+            hint="After you see a doctor at the Medical Centre, each consultation will appear here as part of your health story."
+          />
+        </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
-          {visits.map((v) => (
-            <button
-              key={v.visit_id}
-              onClick={() => setSelectedId(v.visit_id)}
-              className="w-full text-left px-5 py-4 hover:bg-gray-50 transition-colors flex items-center gap-4"
-            >
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center flex-shrink-0">
-                <Stethoscope size={15} className="text-emerald-500" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-medium text-gray-800">{v.doctor_name}</span>
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${VISIT_TYPE_STYLES[v.visit_type] || 'bg-gray-100 text-gray-500'}`}>{v.visit_type}</span>
-                  {v.has_prescription && (
-                    <span className="px-2 py-0.5 rounded-full text-xs bg-sky-50 text-sky-600">Rx</span>
-                  )}
-                </div>
-                <div className="flex gap-3 mt-0.5 text-xs text-gray-400 flex-wrap">
-                  <span>{new Date(v.visit_datetime).toLocaleString()}</span>
-                  {v.chief_complaint && <><span>·</span><span className="truncate max-w-xs">{v.chief_complaint}</span></>}
-                </div>
-              </div>
-              <ChevronRight size={16} className="text-gray-300 flex-shrink-0" />
-            </button>
-          ))}
+        /* Care timeline — newest first, a vertical thread with type-colored dots */
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <ol className="relative border-l-2 border-gray-100 ml-3 space-y-1">
+            {visits.map((v) => (
+              <li key={v.visit_id} className="relative pl-6 pb-4 last:pb-0">
+                {/* dot */}
+                <span
+                  className={`absolute -left-[7px] top-3 w-3 h-3 rounded-full ring-4 ring-white ${VISIT_TYPE_DOTS[v.visit_type] || 'bg-gray-400'}`}
+                />
+                <button
+                  onClick={() => setSelectedId(v.visit_id)}
+                  className="w-full text-left rounded-xl px-3 py-2.5 -ml-1 hover:bg-gray-50 transition-colors group"
+                >
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-display text-sm font-semibold text-gray-800">
+                      {v.diagnosis || v.chief_complaint || 'Consultation'}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${VISIT_TYPE_STYLES[v.visit_type] || 'bg-gray-100 text-gray-500'}`}>{v.visit_type}</span>
+                    {v.has_prescription && (
+                      <span className="px-2 py-0.5 rounded-full text-xs bg-sky-50 text-sky-600">Rx</span>
+                    )}
+                    <ChevronRight size={14} className="text-gray-300 ml-auto opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {v.doctor_name} · {timeAgo(v.visit_datetime)}
+                    <span className="text-gray-300"> · {new Date(v.visit_datetime).toLocaleDateString('en-BD', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                  </p>
+                </button>
+              </li>
+            ))}
+          </ol>
         </div>
       )}
     </div>

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Loader2, Plus, Pencil, Trash2, X, Check } from 'lucide-react';
 import api from '../../api/axios';
+import ConfirmDialog from '../../components/ConfirmDialog';
 
 const UNIT_TYPES = ['OUTPATIENT', 'DENTAL', 'EYE', 'HOMEO', 'PHYSIO', 'PATHOLOGY', 'RADIOLOGY'];
 const TYPE_STYLES = {
@@ -97,8 +98,9 @@ export default function UnitsPage() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete this unit? This will fail if doctors or tokens are linked to it.')) return;
+  const [confirmReq, setConfirmReq] = useState(null);
+
+  const doDelete = async (id) => {
     setDeletingId(id);
     try {
       await api.delete(`/units/${id}`);
@@ -109,9 +111,25 @@ export default function UnitsPage() {
       setDeletingId(null);
     }
   };
+  const handleDelete = (id) => setConfirmReq({
+    title: 'Delete this unit?',
+    message: 'This will fail safely if doctors, tokens or rosters are linked to it.',
+    label: 'Delete', run: () => doDelete(id),
+  });
 
   return (
     <div className="space-y-4">
+      {confirmReq && (
+        <ConfirmDialog
+          open
+          title={confirmReq.title}
+          message={confirmReq.message}
+          confirmLabel={confirmReq.label}
+          tone={confirmReq.tone || 'rose'}
+          onConfirm={async () => { await confirmReq.run(); setConfirmReq(null); }}
+          onClose={() => setConfirmReq(null)}
+        />
+      )}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-gray-800">Medical units</h2>
         <button onClick={() => { setShowForm(true); setEditingId(null); setFormError(''); }} className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-2 text-sm font-medium text-white hover:bg-violet-700">

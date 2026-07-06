@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, XCircle, Loader2, Clock } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { useToast } from '../components/toast';
 import { useAuth } from '../context/AuthContext';
 import { NAV, ROLE_LABEL } from '../config/roles';
 import api from '../api/axios';
@@ -96,12 +98,14 @@ const ROLE_WELCOME = {
 };
 
 function PendingApprovals() {
+  const toast = useToast();
   const [users, setUsers] = useState([]);
   const [units, setUnits] = useState([]);
   const [unitSel, setUnitSel] = useState({}); // { user_id: unit_id } for doctor applicants
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actioningId, setActioningId] = useState(null);
+  const [rejectTarget, setRejectTarget] = useState(null); // user object pending confirm
 
   const loadPending = () => {
     setLoading(true);
@@ -124,22 +128,25 @@ function PendingApprovals() {
       const body = u.role === 'DOCTOR' && unitSel[u.user_id] ? { unit_id: Number(unitSel[u.user_id]) } : {};
       await api.put(`/users/${u.user_id}/approve`, body);
       setUsers((list) => list.filter((x) => x.user_id !== u.user_id));
+      toast.success(`${u.doctor_name || u.username} approved — they can now sign in.`);
     } catch {
-      setError('Unable to approve user.');
+      toast.error('Unable to approve user.');
     } finally {
       setActioningId(null);
     }
   };
 
-  const handleReject = async (id) => {
-    setActioningId(id);
+  const handleReject = async (u) => {
+    setActioningId(u.user_id);
     try {
-      await api.put(`/users/${id}/reject`);
-      setUsers((u) => u.filter((x) => x.user_id !== id));
+      await api.put(`/users/${u.user_id}/reject`);
+      setUsers((list) => list.filter((x) => x.user_id !== u.user_id));
+      toast.success(`${u.doctor_name || u.username}'s application rejected.`);
     } catch {
-      setError('Unable to reject user.');
+      toast.error('Unable to reject user.');
     } finally {
       setActioningId(null);
+      setRejectTarget(null);
     }
   };
 
@@ -202,7 +209,7 @@ function PendingApprovals() {
                       {busy ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Approve
                     </button>
                     <button
-                      onClick={() => handleReject(u.user_id)}
+                      onClick={() => setRejectTarget(u)}
                       disabled={busy}
                       className="inline-flex items-center gap-1 rounded-lg bg-red-500 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-red-600 disabled:opacity-50"
                     >
@@ -218,6 +225,20 @@ function PendingApprovals() {
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!rejectTarget}
+        title={`Reject ${rejectTarget?.doctor_name || rejectTarget?.username}?`}
+        message={
+          rejectTarget?.role === 'DOCTOR'
+            ? 'This deletes their submitted doctor profile as well as the login. They can re-apply later.'
+            : 'Their account will be removed. They can register again later.'
+        }
+        confirmLabel="Reject"
+        busy={actioningId === rejectTarget?.user_id}
+        onConfirm={() => handleReject(rejectTarget)}
+        onClose={() => setRejectTarget(null)}
+      />
     </div>
   );
 }
@@ -251,7 +272,13 @@ export default function DashboardHome() {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <div className="flex items-start justify-between gap-4 flex-wrap">
               <div>
-                <h3 className="text-lg font-semibold text-gray-800">Welcome back, {user.username}</h3>
+                <h3 className="font-display text-xl font-bold text-gray-800">
+                  {(() => {
+                    const h = new Date().getHours();
+                    const g = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+                    return `${g}, ${user.username}`;
+                  })()}
+                </h3>
                 <p className="text-sm text-gray-500 mt-0.5">
                   Signed in as <span className="font-medium text-gray-700">{ROLE_LABEL[user.role]}</span>
                   {' · '}

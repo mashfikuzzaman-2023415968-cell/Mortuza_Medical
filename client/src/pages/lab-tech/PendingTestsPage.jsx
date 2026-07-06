@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Loader2, FlaskConical, RefreshCw, ChevronRight } from 'lucide-react';
 import api from '../../api/axios';
+import { EmptyState, SkeletonRows } from '../../components/ui';
 import TestResultForm from './TestResultForm';
 
 const STATUS_STYLES = {
@@ -85,14 +86,12 @@ export default function PendingTestsPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-gray-400 py-8">
-          <Loader2 size={16} className="animate-spin" /> Loading…
-        </div>
+        <SkeletonRows rows={4} />
       ) : error ? (
         <p className="text-sm text-red-600">{error}</p>
       ) : filtered.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center text-sm text-gray-400">
-          No pending tests.
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+          <EmptyState title="No pending tests" hint="Test orders from doctors will appear here for sample collection and results." />
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">

@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft, Loader2, Pill } from 'lucide-react';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../components/toast';
 
 export default function DispenseForm({ prescriptionId, onBack, onDispensed }) {
+  const toast = useToast();
   const { user } = useAuth();
   const [prescription, setPrescription] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -50,6 +52,7 @@ export default function DispenseForm({ prescriptionId, onBack, onDispensed }) {
     setSubmitting(true);
     try {
       const res = await api.post('/dispense', { prescription_id: prescriptionId, items });
+      toast.success('Medicines dispensed and stock updated.');
       setResult(res.data.data);
       if (onDispensed) onDispensed();
     } catch (err) {

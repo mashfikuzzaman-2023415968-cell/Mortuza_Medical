@@ -4,6 +4,7 @@ import {
   Package, ChevronLeft, ChevronRight, Inbox, Lock,
 } from 'lucide-react';
 import api from '../../api/axios';
+import { StatCard } from '../../components/ui';
 
 /* ── helpers ──────────────────────────────────────────────────── */
 const CAT_BADGE = {
@@ -42,21 +43,6 @@ function billingExplain(rec) {
   return `Patient category: ${rec.patient_category} → Cost price: ${rec.dispensed_quantity} × ${money(rec.unit_price)} = ${money(rec.charged_amount)}`;
 }
 
-/* ── stat card ────────────────────────────────────────────────── */
-function StatCard({ icon: Icon, label, value, color, sub }) {
-  return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
-        <Icon size={20} />
-      </div>
-      <div className="min-w-0">
-        <p className="text-xs text-gray-400">{label}</p>
-        <p className="text-lg font-bold text-gray-800 truncate">{value}</p>
-        {sub && <p className="text-[11px] text-gray-400 truncate">{sub}</p>}
-      </div>
-    </div>
-  );
-}
 
 /* ── detail panel ─────────────────────────────────────────────── */
 function DetailPanel({ id }) {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Clock, Loader2, Play, Siren } from 'lucide-react';
 import api from '../../api/axios';
+import { EmptyState, SkeletonRows } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import VisitForm from './VisitForm';
 import VisitDetail from './VisitDetail';
@@ -79,11 +80,9 @@ export default function QueuePage() {
         {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
 
         {loading ? (
-          <div className="flex items-center gap-2 text-sm text-gray-400 py-4">
-            <Loader2 size={16} className="animate-spin" /> Loading…
-          </div>
+          <SkeletonRows rows={4} />
         ) : waiting.length === 0 ? (
-          <p className="text-sm text-gray-400 py-2">No patients waiting.</p>
+          <EmptyState title="No patients waiting" hint="Tokens issued to your unit will appear here as patients join the queue." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

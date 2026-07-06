@@ -1,20 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ClipboardList, AlertTriangle, Pill } from 'lucide-react';
 import api from '../../api/axios';
-
-function StatCard({ icon: Icon, label, value, color }) {
-  return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${color}`}>
-        <Icon size={20} />
-      </div>
-      <div>
-        <p className="text-xs text-gray-400">{label}</p>
-        <p className="text-xl font-semibold text-gray-800">{value}</p>
-      </div>
-    </div>
-  );
-}
+import { StatCard, AttentionRow } from '../../components/ui';
 
 export default function PharmacyDashboard({ onNavChange }) {
   const [stats, setStats] = useState({ pending: 0, lowStock: 0, medicines: 0 });
@@ -37,10 +24,25 @@ export default function PharmacyDashboard({ onNavChange }) {
 
   return (
     <div className="space-y-6">
+      <AttentionRow
+        items={[
+          stats.lowStock > 0 && {
+            label: `${stats.lowStock} medicine${stats.lowStock > 1 ? 's' : ''} below reorder level`,
+            onClick: () => onNavChange('lowstock'),
+            tone: 'rose',
+          },
+          stats.pending > 0 && {
+            label: `${stats.pending} prescription${stats.pending > 1 ? 's' : ''} to dispense`,
+            onClick: () => onNavChange('dispense'),
+            tone: 'amber',
+          },
+        ]}
+      />
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatCard icon={ClipboardList} label="Pending dispenses" value={stats.pending} color="bg-amber-100 text-amber-600" />
-        <StatCard icon={AlertTriangle} label="Low-stock alerts" value={stats.lowStock} color="bg-red-100 text-red-600" />
-        <StatCard icon={Pill} label="Medicines in catalogue" value={stats.medicines} color="bg-sky-100 text-sky-600" />
+        <StatCard icon={ClipboardList} label="Pending dispenses" value={stats.pending} color="bg-amber-100 text-amber-600" onClick={() => onNavChange('dispense')} pulse={stats.pending > 0} />
+        <StatCard icon={AlertTriangle} label="Low-stock alerts" value={stats.lowStock} color="bg-red-100 text-red-600" onClick={() => onNavChange('lowstock')} />
+        <StatCard icon={Pill} label="Medicines in catalogue" value={stats.medicines} color="bg-sky-100 text-sky-600" onClick={() => onNavChange('stock')} />
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">

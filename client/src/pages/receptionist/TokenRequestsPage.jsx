@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Loader2, CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp, Printer, AlertCircle } from 'lucide-react';
 import api from '../../api/axios';
+import { useToast } from '../../components/toast';
 import TokenCardModal from '../../components/TokenCardModal';
 
 const CAT_COLORS = {
@@ -32,6 +33,7 @@ function CardStatusBadge({ status, expiry }) {
 }
 
 function PendingCard({ req, onApproved, onRejected }) {
+  const toast = useToast();
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -42,6 +44,7 @@ function PendingCard({ req, onApproved, onRejected }) {
     setError('');
     try {
       const res = await api.put(`/token-requests/${req.request_id}/approve`);
+      toast.success(`Request approved — token issued for ${req.patient_name || 'patient'}.`);
       const data = res.data;
       if (data.auto_rejected) {
         onRejected(req.request_id, 'Health card no longer valid — request auto-rejected.');
@@ -60,6 +63,7 @@ function PendingCard({ req, onApproved, onRejected }) {
     setError('');
     try {
       await api.put(`/token-requests/${req.request_id}/reject`, { reject_reason: rejectReason });
+      toast.success('Request rejected.');
       onRejected(req.request_id, null);
     } catch (err) {
       setError(err.response?.data?.error || 'Unable to reject.');

@@ -4,6 +4,7 @@ import {
   Hash, Printer, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import api from '../../api/axios';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import TokenCardModal from '../../components/TokenCardModal';
 
 const THRESHOLD_MS = 48 * 60 * 60 * 1000;
@@ -69,14 +70,15 @@ function ActiveTokenCard({ token, source, onView }) {
 /* ── online-pending request card (no token yet) ───────────────────────── */
 function PendingRequestCard({ req, onCancel }) {
   const [cancelling, setCancelling] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const handleCancel = async () => {
-    if (!window.confirm('Cancel this token request? This cannot be undone.')) return;
     setCancelling(true);
     try {
       await onCancel(req.request_id);
     } finally {
       setCancelling(false);
+      setConfirmOpen(false);
     }
   };
 
@@ -99,13 +101,22 @@ function PendingRequestCard({ req, onCancel }) {
           <Clock size={11} /> Online – Pending
         </span>
         <button
-          onClick={handleCancel}
+          onClick={() => setConfirmOpen(true)}
           disabled={cancelling}
           className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
         >
           {cancelling ? <Loader2 size={11} className="animate-spin" /> : <XCircle size={11} />} Cancel
         </button>
       </div>
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Cancel this token request?"
+        message={`Your pending request for ${req.unit_name} (${fmt(req.preferred_date)}) will be withdrawn. You can submit a new request any time.`}
+        confirmLabel="Cancel request"
+        busy={cancelling}
+        onConfirm={handleCancel}
+        onClose={() => setConfirmOpen(false)}
+      />
     </div>
   );
 }

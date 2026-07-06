@@ -22,9 +22,13 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      // Only mark this as an expired session if the user WAS signed in — a
+      // failed login attempt is also a 401 and shouldn't trigger the notice.
+      const hadSession = !!localStorage.getItem('token');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       if (window.location.pathname !== '/login') {
+        if (hadSession) sessionStorage.setItem('session_expired', '1');
         window.location.href = '/login';
       }
     }

@@ -2,20 +2,7 @@ import { useEffect, useState } from 'react';
 import { Users, Hash, CreditCard, Clock, UserPlus } from 'lucide-react';
 import api from '../../api/axios';
 import DoctorsAvailableNow from '../../components/DoctorsAvailableNow';
-
-function StatCard({ icon: Icon, label, value, color }) {
-  return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${color}`}>
-        <Icon size={20} />
-      </div>
-      <div>
-        <p className="text-xs text-gray-400">{label}</p>
-        <p className="text-xl font-semibold text-gray-800">{value}</p>
-      </div>
-    </div>
-  );
-}
+import { StatCard, AttentionRow } from '../../components/ui';
 
 export default function ReceptionDashboard({ onNavChange }) {
   const [stats, setStats] = useState({ patients: 0, activeCards: 0, tokensToday: 0, waiting: 0 });
@@ -42,11 +29,21 @@ export default function ReceptionDashboard({ onNavChange }) {
 
   return (
     <div className="space-y-6">
+      <AttentionRow
+        items={[
+          stats.waiting > 0 && {
+            label: `${stats.waiting} patient${stats.waiting > 1 ? 's' : ''} waiting in the queue`,
+            onClick: () => onNavChange('tokens'),
+            tone: 'amber',
+          },
+        ]}
+      />
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={Users} label="Total patients" value={stats.patients} color="bg-sky-100 text-sky-600" />
-        <StatCard icon={CreditCard} label="Active health cards" value={stats.activeCards} color="bg-emerald-100 text-emerald-600" />
-        <StatCard icon={Hash} label="Tokens issued today" value={stats.tokensToday} color="bg-violet-100 text-violet-600" />
-        <StatCard icon={Clock} label="Waiting in queue" value={stats.waiting} color="bg-amber-100 text-amber-600" />
+        <StatCard icon={Users} label="Total patients" value={stats.patients} color="bg-sky-100 text-sky-600" onClick={() => onNavChange('patients')} />
+        <StatCard icon={CreditCard} label="Active health cards" value={stats.activeCards} color="bg-emerald-100 text-emerald-600" onClick={() => onNavChange('cards')} />
+        <StatCard icon={Hash} label="Tokens issued today" value={stats.tokensToday} color="bg-violet-100 text-violet-600" onClick={() => onNavChange('tokens')} />
+        <StatCard icon={Clock} label="Waiting in queue" value={stats.waiting} color="bg-amber-100 text-amber-600" onClick={() => onNavChange('tokens')} pulse={stats.waiting > 0} />
       </div>
 
       <DoctorsAvailableNow

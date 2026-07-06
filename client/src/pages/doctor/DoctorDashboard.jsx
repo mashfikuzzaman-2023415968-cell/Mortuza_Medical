@@ -2,20 +2,7 @@ import { useEffect, useState } from 'react';
 import { Clock, Stethoscope, FlaskConical, BedDouble, Siren } from 'lucide-react';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
-
-function StatCard({ icon: Icon, label, value, color }) {
-  return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${color}`}>
-        <Icon size={20} />
-      </div>
-      <div>
-        <p className="text-xs text-gray-400">{label}</p>
-        <p className="text-xl font-semibold text-gray-800">{value}</p>
-      </div>
-    </div>
-  );
-}
+import { StatCard, AttentionRow } from '../../components/ui';
 
 export default function DoctorDashboard({ onNavChange }) {
   const { user } = useAuth();
@@ -49,11 +36,26 @@ export default function DoctorDashboard({ onNavChange }) {
           <span className="font-medium">No unit assigned yet.</span> An admin needs to assign you to a unit before your token queue will show your patients. Please contact the administrator.
         </div>
       )}
+      <AttentionRow
+        items={[
+          stats.waiting > 0 && {
+            label: `${stats.waiting} patient${stats.waiting > 1 ? 's' : ''} waiting in your queue`,
+            onClick: () => onNavChange('queue'),
+            tone: 'amber',
+          },
+          stats.pendingTests > 0 && {
+            label: `${stats.pendingTests} test order${stats.pendingTests > 1 ? 's' : ''} awaiting results`,
+            onClick: () => onNavChange('tests'),
+            tone: 'amber',
+          },
+        ]}
+      />
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={Clock} label="Waiting in queue" value={stats.waiting} color="bg-amber-100 text-amber-600" />
-        <StatCard icon={Stethoscope} label="Visits today" value={stats.visitsToday} color="bg-emerald-100 text-emerald-600" />
-        <StatCard icon={FlaskConical} label="Pending test orders" value={stats.pendingTests} color="bg-violet-100 text-violet-600" />
-        <StatCard icon={BedDouble} label="Admitted patients" value={stats.admitted} color="bg-sky-100 text-sky-600" />
+        <StatCard icon={Clock} label="Waiting in queue" value={stats.waiting} color="bg-amber-100 text-amber-600" onClick={() => onNavChange('queue')} pulse={stats.waiting > 0} />
+        <StatCard icon={Stethoscope} label="Visits today" value={stats.visitsToday} color="bg-emerald-100 text-emerald-600" onClick={() => onNavChange('visits')} />
+        <StatCard icon={FlaskConical} label="Pending test orders" value={stats.pendingTests} color="bg-violet-100 text-violet-600" onClick={() => onNavChange('tests')} />
+        <StatCard icon={BedDouble} label="Admitted patients" value={stats.admitted} color="bg-sky-100 text-sky-600" onClick={() => onNavChange('admissions')} />
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">

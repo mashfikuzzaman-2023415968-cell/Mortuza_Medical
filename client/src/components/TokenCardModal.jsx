@@ -48,15 +48,35 @@ export default function TokenCardModal({ tokenId, onClose }) {
     };
   }, [onClose]);
 
-  // Inject print CSS
+  // Inject print CSS. Two hard-won gotchas here:
+  //  1. The card's ANCESTORS must never be display:none (no-print) — display
+  //     kills the whole subtree and visibility can't bring the card back.
+  //  2. Browsers freeze CSS animations at their FIRST keyframe when printing,
+  //     so any entry animation (fadeIn/cardPop/page-enter) on an ancestor
+  //     leaves everything at opacity:0 → blank page. Kill all animation in print.
   useEffect(() => {
     const style = document.createElement('style');
     style.id = 'token-print-css';
     style.textContent = `
       @media print {
         @page { margin: 0; size: auto; }
+        *, *::before, *::after {
+          animation: none !important;
+          transition: none !important;
+        }
         body * { visibility: hidden !important; }
-        .print-token-card, .print-token-card * { visibility: visible !important; }
+        .token-print-backdrop {
+          opacity: 1 !important;
+          background: none !important;
+          backdrop-filter: none !important;
+        }
+        .token-print-backdrop > div { opacity: 1 !important; transform: none !important; }
+        .print-token-card, .print-token-card * {
+          visibility: visible !important;
+          opacity: 1 !important;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
         .print-token-card { position: fixed !important; left: 50% !important; top: 50% !important;
           transform: translate(-50%, -50%) !important; width: 420px !important; }
         .no-print { display: none !important; }
@@ -76,7 +96,7 @@ export default function TokenCardModal({ tokenId, onClose }) {
     <div
       ref={backdropRef}
       onClick={handleBackdropClick}
-      className="no-print fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      className="token-print-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
       style={{ animation: 'fadeIn 0.15s ease-out' }}
     >
       <div

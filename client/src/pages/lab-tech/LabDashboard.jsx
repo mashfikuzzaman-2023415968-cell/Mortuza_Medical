@@ -1,23 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Clock, CheckCircle2, FlaskConical, BookOpen } from 'lucide-react';
 import api from '../../api/axios';
-
-function StatCard({ icon: Icon, label, value, color, onClick }) {
-  return (
-    <div
-      onClick={onClick}
-      className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4 ${onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
-    >
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${color}`}>
-        <Icon size={20} />
-      </div>
-      <div>
-        <p className="text-xs text-gray-400">{label}</p>
-        <p className="text-xl font-semibold text-gray-800">{value ?? '—'}</p>
-      </div>
-    </div>
-  );
-}
+import { StatCard, AttentionRow } from '../../components/ui';
 
 export default function LabDashboard({ onNavChange }) {
   const [stats, setStats] = useState({ pending: 0, completed: 0, catalogue: 0 });
@@ -42,6 +26,16 @@ export default function LabDashboard({ onNavChange }) {
 
   return (
     <div className="space-y-6">
+      <AttentionRow
+        items={[
+          !loading && stats.pending > 0 && {
+            label: `${stats.pending} test${stats.pending > 1 ? 's' : ''} awaiting processing`,
+            onClick: () => onNavChange('pending'),
+            tone: 'amber',
+          },
+        ]}
+      />
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
           icon={Clock}
@@ -49,6 +43,7 @@ export default function LabDashboard({ onNavChange }) {
           value={loading ? '…' : stats.pending}
           color="bg-amber-100 text-amber-600"
           onClick={() => onNavChange('pending')}
+          pulse={!loading && stats.pending > 0}
         />
         <StatCard
           icon={CheckCircle2}

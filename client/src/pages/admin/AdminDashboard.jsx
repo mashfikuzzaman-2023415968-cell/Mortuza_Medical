@@ -2,30 +2,7 @@ import { useEffect, useState } from 'react';
 import { Users, Stethoscope, BedDouble, Ambulance, DollarSign, Clock, UserCheck, AlertCircle, CheckCircle2, XCircle, Inbox } from 'lucide-react';
 import api from '../../api/axios';
 import DoctorsAvailableNow from '../../components/DoctorsAvailableNow';
-
-function StatCard({ icon: Icon, label, value, sub, color, onClick }) {
-  return (
-    <div
-      onClick={onClick}
-      className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4 ${onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
-    >
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
-        <Icon size={22} />
-      </div>
-      <div>
-        <p className="text-xs text-gray-400">{label}</p>
-        <p className="text-xl font-bold text-gray-800">{value ?? '—'}</p>
-        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
-      </div>
-    </div>
-  );
-}
-
-const OP_STYLE = {
-  IN_SERVICE: 'bg-emerald-100 text-emerald-700',
-  MAINTENANCE: 'bg-amber-100 text-amber-700',
-  RETIRED: 'bg-gray-100 text-gray-500',
-};
+import { StatCard, StatusPill, AttentionRow, SkeletonRows } from '../../components/ui';
 
 export default function AdminDashboard({ onNavChange }) {
   const [data, setData] = useState(null);
@@ -55,15 +32,37 @@ export default function AdminDashboard({ onNavChange }) {
 
   return (
     <div className="space-y-6">
+      {/* What needs the admin right now */}
+      {!loading && (
+        <AttentionRow
+          items={[
+            data?.pending_approvals > 0 && {
+              label: `${data.pending_approvals} account${data.pending_approvals > 1 ? 's' : ''} awaiting approval`,
+              onClick: () => onNavChange('pending'),
+              tone: 'amber',
+            },
+            pendingTokenReqs > 0 && {
+              label: `${pendingTokenReqs} token request${pendingTokenReqs > 1 ? 's' : ''} pending review`,
+              tone: 'amber',
+            },
+            data?.free_ambulances === 0 && {
+              label: 'No ambulance free to dispatch',
+              onClick: () => onNavChange('ambulance'),
+              tone: 'rose',
+            },
+          ]}
+        />
+      )}
+
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        <StatCard icon={Users} label="Total patients" value={val('total_patients')} color="bg-sky-100 text-sky-600" onClick={() => {}} />
-        <StatCard icon={Stethoscope} label="Visits today" value={val('visits_today')} color="bg-emerald-100 text-emerald-600" onClick={() => {}} />
+        <StatCard icon={Users} label="Total patients" value={val('total_patients')} color="bg-sky-100 text-sky-600" />
+        <StatCard icon={Stethoscope} label="Visits today" value={val('visits_today')} color="bg-emerald-100 text-emerald-600" pulse />
         <StatCard icon={DollarSign} label="Revenue today" value={loading ? '…' : data ? `৳${Number(data.revenue_today).toFixed(2)}` : '—'} color="bg-violet-100 text-violet-600" onClick={() => onNavChange('reports')} />
         <StatCard icon={BedDouble} label="Beds occupied" value={loading ? '…' : data ? `${data.beds_occupied}/${data.beds_occupied + data.beds_free}` : '—'} sub={loading ? '' : data ? `${data.beds_free} free` : ''} color="bg-amber-100 text-amber-600" onClick={() => onNavChange('reports')} />
         <StatCard icon={Ambulance} label="Ambulances free" value={val('free_ambulances')} color="bg-rose-100 text-rose-600" onClick={() => onNavChange('ambulance')} />
         <StatCard icon={UserCheck} label="Pending approvals" value={val('pending_approvals')} color="bg-orange-100 text-orange-600" onClick={() => onNavChange('pending')} />
-        <StatCard icon={Inbox} label="Pending token requests" value={loading ? '…' : (pendingTokenReqs ?? '—')} color="bg-teal-100 text-teal-600" onClick={() => {}} />
+        <StatCard icon={Inbox} label="Pending token requests" value={loading ? '…' : (pendingTokenReqs ?? '—')} color="bg-teal-100 text-teal-600" />
       </div>
 
       {/* Doctors available now (compact) */}
@@ -76,7 +75,7 @@ export default function AdminDashboard({ onNavChange }) {
           <button onClick={() => onNavChange('ambulance')} className="text-xs text-rose-600 hover:underline">Manage →</button>
         </div>
         {loading ? (
-          <p className="text-sm text-gray-400">Loading…</p>
+          <SkeletonRows rows={2} />
         ) : ambulances.length === 0 ? (
           <p className="text-sm text-gray-400">No ambulances registered.</p>
         ) : (
@@ -87,9 +86,7 @@ export default function AdminDashboard({ onNavChange }) {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-800 truncate">{amb.registration_no}</p>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${OP_STYLE[amb.operational_status] || 'bg-gray-100 text-gray-500'}`}>
-                      {amb.operational_status}
-                    </span>
+                    <StatusPill status={amb.operational_status} />
                     {amb.currently_on_trip && (
                       <span className="flex items-center gap-0.5 text-xs text-rose-600"><AlertCircle size={11} /> On trip</span>
                     )}
@@ -114,7 +111,7 @@ export default function AdminDashboard({ onNavChange }) {
           <button onClick={() => onNavChange('reports')} className="text-xs text-sky-600 hover:underline">Full report →</button>
         </div>
         {loading ? (
-          <p className="text-sm text-gray-400">Loading…</p>
+          <SkeletonRows rows={3} />
         ) : workload.length === 0 ? (
           <p className="text-sm text-gray-400">No visit data yet.</p>
         ) : (

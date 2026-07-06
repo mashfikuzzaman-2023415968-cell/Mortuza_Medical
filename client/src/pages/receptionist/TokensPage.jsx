@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Hash, Loader2, CheckCircle2, XCircle, Clock, Printer, ChevronDown, ChevronUp } from 'lucide-react';
+import { Hash, Loader2, CheckCircle2, XCircle, Clock, Printer, ChevronDown, ChevronUp, MonitorPlay } from 'lucide-react';
 import api from '../../api/axios';
 import PatientPicker from '../../components/PatientPicker';
 import TokenCardModal from '../../components/TokenCardModal';
+import QueueBoard from '../../components/QueueBoard';
+import { useToast } from '../../components/toast';
 
 const THRESHOLD_MS = 48 * 60 * 60 * 1000;
 
@@ -77,6 +79,7 @@ function TokenTable({ rows, showDate, onView }) {
 }
 
 export default function TokensPage() {
+  const toast = useToast();
   const [tokens, setTokens] = useState([]);
   const [units, setUnits] = useState([]);
   const [patients, setPatients] = useState([]);
@@ -93,6 +96,7 @@ export default function TokensPage() {
   const [scope, setScope] = useState('today'); // 'today' | 'all'
   const [pastOpen, setPastOpen] = useState(false);
   const [viewTokenId, setViewTokenId] = useState(null);
+  const [showBoard, setShowBoard] = useState(false);
 
   const loadTokens = (unit = filterUnit, sc = scope) => {
     setLoading(true);
@@ -125,6 +129,7 @@ export default function TokensPage() {
       const res = await api.post('/tokens', { patient_id: Number(patientId), unit_id: Number(unitId) });
       const t = res.data.data;
       setFormSuccess(`Token #${t.token_number} issued for ${t.patient_name} (${t.unit_name}).`);
+      toast.success(`Token #${t.token_number} issued for ${t.patient_name}.`);
       setPatientId('');
       loadTokens();
       setViewTokenId(t.token_id);
@@ -158,9 +163,18 @@ export default function TokensPage() {
     <div className="space-y-4">
       {/* Issue token */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Hash size={18} className="text-sky-600" />
-          <h3 className="text-lg font-semibold text-gray-800">Issue Token</h3>
+        <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Hash size={18} className="text-sky-600" />
+            <h3 className="text-lg font-semibold text-gray-800">Issue Token</h3>
+          </div>
+          <button
+            onClick={() => setShowBoard(true)}
+            title="Open the waiting-room queue display"
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+          >
+            <MonitorPlay size={14} /> Queue board
+          </button>
         </div>
 
         {formError && <p className="text-sm text-red-600 mb-3">{formError}</p>}
@@ -287,6 +301,8 @@ export default function TokensPage() {
       {viewTokenId && (
         <TokenCardModal tokenId={viewTokenId} onClose={() => setViewTokenId(null)} />
       )}
+
+      {showBoard && <QueueBoard onClose={() => setShowBoard(false)} />}
     </div>
   );
 }

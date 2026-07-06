@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Loader2, Plus, Pencil, Trash2, X, Check } from 'lucide-react';
 import api from '../../api/axios';
+import ConfirmDialog from '../../components/ConfirmDialog';
 
 const DOCTOR_TYPES = ['GENERAL', 'SPECIALIST', 'EYE', 'DENTAL', 'HOMEO', 'PHYSIO'];
 const GENDERS = [{ v: '', l: '—' }, { v: 'M', l: 'Male' }, { v: 'F', l: 'Female' }];
@@ -140,8 +141,9 @@ export default function DoctorsPage() {
     }
   };
 
-  const handleDelete = async (id, name) => {
-    if (!window.confirm(`Delete Dr. ${name}? This cannot be undone.`)) return;
+  const [confirmReq, setConfirmReq] = useState(null);
+
+  const doDelete = async (id) => {
     setDeletingId(id);
     try {
       await api.delete(`/doctors/${id}`);
@@ -152,6 +154,11 @@ export default function DoctorsPage() {
       setDeletingId(null);
     }
   };
+  const handleDelete = (id, name) => setConfirmReq({
+    title: `Delete Dr. ${name}?`,
+    message: 'This permanently removes the doctor record. It will fail if visits, rosters or a login are linked to them.',
+    label: 'Delete', run: () => doDelete(id),
+  });
 
   const startEdit = (doc) => {
     setEditingId(doc.doctor_id);
@@ -161,6 +168,17 @@ export default function DoctorsPage() {
 
   return (
     <div className="space-y-4">
+      {confirmReq && (
+        <ConfirmDialog
+          open
+          title={confirmReq.title}
+          message={confirmReq.message}
+          confirmLabel={confirmReq.label}
+          tone={confirmReq.tone || 'rose'}
+          onConfirm={async () => { await confirmReq.run(); setConfirmReq(null); }}
+          onClose={() => setConfirmReq(null)}
+        />
+      )}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-xl font-semibold text-gray-800">Doctors</h2>
         <button onClick={() => { setShowForm(true); setEditingId(null); setFormError(''); }} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-700">

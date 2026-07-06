@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Pill, Loader2, Plus, Pencil, Trash2, X } from 'lucide-react';
 import api from '../../api/axios';
+import ConfirmDialog from '../../components/ConfirmDialog';
 
 const DOSAGE_FORMS = ['TABLET', 'CAPSULE', 'SYRUP', 'INJECTION', 'OINTMENT', 'DROPS', 'POWDER'];
 
@@ -168,8 +169,9 @@ export default function MedicinesPage() {
     load();
   }, []);
 
-  const handleDelete = async (medicine) => {
-    if (!window.confirm(`Delete ${medicine.medicine_name}? This cannot be undone.`)) return;
+  const [confirmReq, setConfirmReq] = useState(null);
+
+  const doDelete = async (medicine) => {
     setDeletingId(medicine.medicine_id);
     setError('');
     try {
@@ -181,9 +183,25 @@ export default function MedicinesPage() {
       setDeletingId(null);
     }
   };
+  const handleDelete = (medicine) => setConfirmReq({
+    title: `Delete ${medicine.medicine_name}?`,
+    message: 'This cannot be undone. Deletion fails safely if the medicine appears on any prescription.',
+    label: 'Delete', run: () => doDelete(medicine),
+  });
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+      {confirmReq && (
+        <ConfirmDialog
+          open
+          title={confirmReq.title}
+          message={confirmReq.message}
+          confirmLabel={confirmReq.label}
+          tone={confirmReq.tone || 'rose'}
+          onConfirm={async () => { await confirmReq.run(); setConfirmReq(null); }}
+          onClose={() => setConfirmReq(null)}
+        />
+      )}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Pill size={18} className="text-amber-600" />

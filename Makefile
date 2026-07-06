@@ -62,6 +62,14 @@ db-reset: db-drop db ## Drop and rebuild the database from scratch (DESTROYS ALL
 db-queries: ## Run the demo SQL queries and print their results
 	@$(LOAD_PGENV); psql -f "$(QUERIES)"
 
+demo-reset: ## Clear transactional data so you can enter it via the app (keeps master data, staff logins, roster)
+	@echo "This will DELETE all patients, health cards, tokens, visits, prescriptions,"
+	@echo "dispenses, test orders, admissions, dispatches and patient logins."
+	@echo "It KEEPS: unit, shift, medicine, doctor, diagnostic_test, ambulance, bed,"
+	@echo "duty_roster, and all staff logins."
+	@read -p "Continue? [y/N] " ok; [ "$$ok" = "y" ] || [ "$$ok" = "Y" ] || { echo "aborted"; exit 1; }
+	@$(LOAD_PGENV); psql -v ON_ERROR_STOP=1 -f demo_reset.sql && echo "✓ demo reset complete — log in and start entering data through the app."
+
 # ── Run the app ──────────────────────────────────────────────────────────────
 backend: ## Start the backend only (http://localhost:5000)
 	cd server && npm start

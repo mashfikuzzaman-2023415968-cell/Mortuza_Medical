@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Loader2, Pill, FlaskConical, Plus, Trash2, Stethoscope, Pencil, X } from 'lucide-react';
+import { ArrowLeft, Loader2, Pill, FlaskConical, Plus, Trash2, Stethoscope, Pencil, X, Printer } from 'lucide-react';
+import PrescriptionPrintModal from '../../components/PrescriptionPrintModal';
 import api from '../../api/axios';
 
 const VISIT_TYPES = ['NEW', 'FOLLOWUP', 'EMERGENCY'];
@@ -300,6 +301,7 @@ export default function VisitDetail({ visitId, medicines, diagnosticTests, onBac
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editingVisit, setEditingVisit] = useState(false);
+  const [showRxPrint, setShowRxPrint] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -378,10 +380,26 @@ export default function VisitDetail({ visitId, medicines, diagnosticTests, onBac
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Pill size={18} className="text-sky-600" />
-          <h3 className="text-lg font-semibold text-gray-800">Prescription</h3>
+        <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Pill size={18} className="text-sky-600" />
+            <h3 className="text-lg font-semibold text-gray-800">Prescription</h3>
+          </div>
+          {visit.prescription && (
+            <button
+              onClick={() => setShowRxPrint(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-teal-700"
+            >
+              <Printer size={13} /> Print
+            </button>
+          )}
         </div>
+        {showRxPrint && visit.prescription && (
+          <PrescriptionPrintModal
+            prescriptionId={visit.prescription.prescription_id}
+            onClose={() => setShowRxPrint(false)}
+          />
+        )}
         {visit.prescription ? (
           <div className="space-y-3">
             <div className="overflow-x-auto">
