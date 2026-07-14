@@ -80,6 +80,7 @@ export default function LoginPage({ initialMode = 'signin' }) {
       const res = await api.post('/auth/login', { username: username.trim(), password });
       const { token, user } = res.data.data;
       login(token, user);
+      sessionStorage.setItem('mdc_splash', '1'); // one-time welcome splash
       navigate('/');
     } catch (err) {
       const status = err.response?.status;

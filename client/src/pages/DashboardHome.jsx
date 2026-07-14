@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, XCircle, Loader2, Clock } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, Clock, HeartPulse } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { useToast } from '../components/toast';
@@ -243,11 +244,54 @@ function PendingApprovals() {
   );
 }
 
+/* One-time full-screen welcome moment right after sign-in, then dissolves. */
+function WelcomeSplash({ username, role, onDone }) {
+  const [leaving, setLeaving] = useState(false);
+  useEffect(() => {
+    const t1 = setTimeout(() => setLeaving(true), 1500);
+    const t2 = setTimeout(onDone, 1950);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [onDone]);
+
+  const h = new Date().getHours();
+  const greeting = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+
+  // Portal to <body>: the page wrapper's entry animation leaves a transform on
+  // an ancestor, which would trap position:fixed and clip the splash.
+  return createPortal(
+    <div
+      className={`fixed inset-0 z-[200] flex flex-col items-center justify-center text-center px-6 ${leaving ? 'splash-leaving' : ''}`}
+      style={{ background: 'radial-gradient(circle at 30% 20%, #103330, #0b2422 55%, #0a1a1c 100%)' }}
+    >
+      <span className="w-14 h-14 rounded-2xl brand-gradient flex items-center justify-center mb-5"
+        style={{ animation: 'cardPop 0.45s cubic-bezier(0.34,1.56,0.64,1) both' }}>
+        <HeartPulse size={28} className="text-white" />
+      </span>
+      <h1 className="font-display text-3xl font-bold text-white" style={{ animation: 'pageEnter 0.5s ease 0.15s both' }}>
+        {greeting}, {username}
+      </h1>
+      <p className="text-teal-200/70 text-sm mt-2" style={{ animation: 'pageEnter 0.5s ease 0.3s both' }}>
+        {ROLE_LABEL[role]} · MDC Web Portal
+      </p>
+      <div className="mt-8 h-[2px] w-56 rounded-full overflow-hidden">
+        <div className="h-full w-full brand-gradient origin-left"
+          style={{ animation: 'splashLine 1.1s cubic-bezier(0.4,0,0.2,1) 0.2s both' }} />
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export default function DashboardHome() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [nav, setNav] = useState('dash');
   const [pendingTokenReqCount, setPendingTokenReqCount] = useState(0);
+  const [splash, setSplash] = useState(() => {
+    const v = sessionStorage.getItem('mdc_splash') === '1';
+    sessionStorage.removeItem('mdc_splash');
+    return v;
+  });
 
   useEffect(() => {
     if (user.role === 'RECEPTIONIST') {
@@ -267,6 +311,7 @@ export default function DashboardHome() {
 
   return (
     <DashboardLayout role={user.role} username={user.username} nav={nav} onNavChange={setNav} onLogout={handleLogout} navBadges={user.role === 'RECEPTIONIST' ? { treqs: pendingTokenReqCount } : {}}>
+      {splash && <WelcomeSplash username={user.username} role={user.role} onDone={() => setSplash(false)} />}
       {nav === 'dash' ? (
         <div className="space-y-6">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">

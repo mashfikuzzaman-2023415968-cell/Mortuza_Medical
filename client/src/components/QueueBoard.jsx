@@ -88,8 +88,9 @@ export default function QueueBoard({ onClose }) {
             return (
               <div key={unit} className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-6">
                 <p className="text-teal-200/80 text-sm font-medium truncate">{unit}</p>
-                <div className="mt-3 flex items-end gap-3">
-                  <span className="font-display text-white font-bold leading-none tabular-nums" style={{ fontSize: 72 }}>
+                <div className="mt-3 flex items-end gap-3 overflow-hidden">
+                  {/* key on the number: when it changes, the new digit slides in like an odometer */}
+                  <span key={serving.token_number} className="odo-in font-display text-white font-bold leading-none tabular-nums" style={{ fontSize: 72 }}>
                     {serving.token_number}
                   </span>
                   <span className="mb-2 inline-flex items-center gap-1.5 text-emerald-300 text-xs font-semibold uppercase tracking-widest">
@@ -105,7 +106,7 @@ export default function QueueBoard({ onClose }) {
                   ) : (
                     next.map((t) => (
                       <span key={t.token_id}
-                        className="font-display font-semibold text-teal-100 bg-white/10 rounded-lg px-2.5 py-1 tabular-nums">
+                        className="odo-in font-display font-semibold text-teal-100 bg-white/10 rounded-lg px-2.5 py-1 tabular-nums">
                         {t.token_number}
                       </span>
                     ))

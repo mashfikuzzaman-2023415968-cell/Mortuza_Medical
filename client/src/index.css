@@ -172,6 +172,37 @@ h1, h2, h3, .font-display { font-family: 'Space Grotesk', 'Inter', sans-serif; }
 }
 .page-enter { animation: pageEnter 0.22s ease both; }
 
+/* Cards inside grids cascade in, 50ms apart (mirrors the landing timeline) */
+.page-enter .grid > * { animation: pageEnter 0.35s ease both; }
+.page-enter .grid > *:nth-child(1) { animation-delay: 0.03s; }
+.page-enter .grid > *:nth-child(2) { animation-delay: 0.08s; }
+.page-enter .grid > *:nth-child(3) { animation-delay: 0.13s; }
+.page-enter .grid > *:nth-child(4) { animation-delay: 0.18s; }
+.page-enter .grid > *:nth-child(5) { animation-delay: 0.23s; }
+.page-enter .grid > *:nth-child(6) { animation-delay: 0.28s; }
+.page-enter .grid > *:nth-child(7) { animation-delay: 0.33s; }
+.page-enter .grid > *:nth-child(8) { animation-delay: 0.38s; }
+
+/* Post-login welcome splash */
+@keyframes splashLine {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+@keyframes splashOut {
+  to { opacity: 0; visibility: hidden; }
+}
+.splash-leaving { animation: splashOut 0.45s ease forwards; }
+
+/* Queue board: new "now serving" number slides in like an odometer */
+@keyframes odoIn {
+  from { transform: translateY(55%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+.odo-in { display: inline-block; animation: odoIn 0.45s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+
+/* Gauge track in dark mode */
+.dark .gauge-track { stroke: #253841; }
+
 /* Skeleton shimmer for loading states */
 .skeleton {
   position: relative; overflow: hidden;
@@ -217,7 +248,7 @@ button:focus-visible, a:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .page-enter, .skeleton::after { animation: none !important; }
+  .page-enter, .page-enter *, .skeleton::after, .odo-in { animation: none !important; }
 }
 
 /* Printing: browsers freeze CSS animations at their FIRST keyframe, so the

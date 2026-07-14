@@ -1,4 +1,34 @@
+import { useEffect, useRef, useState } from 'react';
 import { ArrowUpRight, Inbox, AlertTriangle } from 'lucide-react';
+
+const reducedMotion = () =>
+  typeof window !== 'undefined' &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** Count-up: numeric values tick from 0 to their target with an ease-out.
+ *  Non-numeric values ("—", "0/30", "৳…") render unchanged. */
+export function AnimatedNumber({ value, duration = 700 }) {
+  const target = typeof value === 'number' ? value : /^\d+$/.test(String(value)) ? Number(value) : null;
+  const [shown, setShown] = useState(target !== null && !reducedMotion() ? 0 : value);
+  const rafRef = useRef();
+
+  useEffect(() => {
+    if (target === null || reducedMotion()) { setShown(value); return; }
+    const start = performance.now();
+    const tick = (now) => {
+      const t = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+      setShown(Math.round(target * eased));
+      if (t < 1) rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    // rAF starves in throttled/background tabs — always land on the target
+    const safety = setTimeout(() => setShown(target), duration + 150);
+    return () => { cancelAnimationFrame(rafRef.current); clearTimeout(safety); };
+  }, [value, target, duration]);
+
+  return <>{target === null ? (value ?? '—') : shown}</>;
+}
 
 /* ── formatting helpers ─────────────────────────────────────────────────────── */
 
@@ -73,7 +103,7 @@ export function StatCard({ icon: Icon, label, value, sub, color, onClick, pulse 
           )}
           <span className="truncate">{label}</span>
         </p>
-        <p className="font-display text-2xl font-bold text-gray-800 leading-tight">{value ?? '—'}</p>
+        <p className="font-display text-2xl font-bold text-gray-800 leading-tight"><AnimatedNumber value={value} /></p>
         {sub && <p className="text-xs text-gray-400 mt-0.5 truncate">{sub}</p>}
       </div>
       {clickable && (
@@ -81,6 +111,65 @@ export function StatCard({ icon: Icon, label, value, sub, color, onClick, pulse 
           size={15}
           className="absolute top-3 right-3 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity"
         />
+      )}
+    </div>
+  );
+}
+
+/** Donut gauge that sweeps from 0 to its value on mount. */
+export function Gauge({ value = 0, max = 1, size = 92, stroke = 9, color = '#0d9488', track = '#e5e7eb' }) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const frac = max > 0 ? Math.min(Math.max(value / max, 0), 1) : 0;
+  const [offset, setOffset] = useState(reducedMotion() ? c * (1 - frac) : c);
+
+  useEffect(() => {
+    if (reducedMotion()) { setOffset(c * (1 - frac)); return; }
+    // start fully empty, then let the CSS transition sweep it in
+    const id = requestAnimationFrame(() =>
+      requestAnimationFrame(() => setOffset(c * (1 - frac))));
+    return () => cancelAnimationFrame(id);
+  }, [frac, c]);
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="flex-shrink-0" style={{ transform: 'rotate(-90deg)' }}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={track} strokeWidth={stroke} className="gauge-track" />
+      <circle
+        cx={size / 2} cy={size / 2} r={r} fill="none"
+        stroke={color} strokeWidth={stroke} strokeLinecap="round"
+        strokeDasharray={c} strokeDashoffset={offset}
+        style={{ transition: 'stroke-dashoffset 0.9s cubic-bezier(0.25, 0.8, 0.35, 1)' }}
+      />
+    </svg>
+  );
+}
+
+/** Stat card with a sweeping donut instead of an icon (e.g. bed occupancy). */
+export function GaugeCard({ value = 0, max = 1, label, sub, color = '#0d9488', onClick }) {
+  const clickable = typeof onClick === 'function';
+  return (
+    <div
+      onClick={onClick}
+      className={`group bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-4 relative transition-all duration-200 ${
+        clickable ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : ''
+      }`}
+    >
+      <div className="relative">
+        <Gauge value={value} max={max} color={color} />
+        <span className="absolute inset-0 flex items-center justify-center font-display text-sm font-bold text-gray-800">
+          <AnimatedNumber value={value} />
+        </span>
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs text-gray-400 truncate">{label}</p>
+        <p className="font-display text-xl font-bold text-gray-800 leading-tight">
+          <AnimatedNumber value={value} />
+          <span className="text-sm text-gray-400 font-medium"> / {max}</span>
+        </p>
+        {sub && <p className="text-xs text-gray-400 mt-0.5 truncate">{sub}</p>}
+      </div>
+      {clickable && (
+        <ArrowUpRight size={15} className="absolute top-3 right-3 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
       )}
     </div>
   );

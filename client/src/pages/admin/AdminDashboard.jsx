@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Users, Stethoscope, BedDouble, Ambulance, DollarSign, Clock, UserCheck, AlertCircle, CheckCircle2, XCircle, Inbox } from 'lucide-react';
 import api from '../../api/axios';
 import DoctorsAvailableNow from '../../components/DoctorsAvailableNow';
-import { StatCard, StatusPill, AttentionRow, SkeletonRows } from '../../components/ui';
+import { StatCard, GaugeCard, StatusPill, AttentionRow, SkeletonRows } from '../../components/ui';
 
 export default function AdminDashboard({ onNavChange }) {
   const [data, setData] = useState(null);
@@ -59,7 +59,18 @@ export default function AdminDashboard({ onNavChange }) {
         <StatCard icon={Users} label="Total patients" value={val('total_patients')} color="bg-sky-100 text-sky-600" />
         <StatCard icon={Stethoscope} label="Visits today" value={val('visits_today')} color="bg-emerald-100 text-emerald-600" pulse />
         <StatCard icon={DollarSign} label="Revenue today" value={loading ? '…' : data ? `৳${Number(data.revenue_today).toFixed(2)}` : '—'} color="bg-violet-100 text-violet-600" onClick={() => onNavChange('reports')} />
-        <StatCard icon={BedDouble} label="Beds occupied" value={loading ? '…' : data ? `${data.beds_occupied}/${data.beds_occupied + data.beds_free}` : '—'} sub={loading ? '' : data ? `${data.beds_free} free` : ''} color="bg-amber-100 text-amber-600" onClick={() => onNavChange('reports')} />
+        {loading || !data ? (
+          <StatCard icon={BedDouble} label="Beds occupied" value="…" color="bg-amber-100 text-amber-600" />
+        ) : (
+          <GaugeCard
+            value={data.beds_occupied}
+            max={data.beds_occupied + data.beds_free}
+            label="Beds occupied"
+            sub={`${data.beds_free} free`}
+            color="#f59e0b"
+            onClick={() => onNavChange('reports')}
+          />
+        )}
         <StatCard icon={Ambulance} label="Ambulances free" value={val('free_ambulances')} color="bg-rose-100 text-rose-600" onClick={() => onNavChange('ambulance')} />
         <StatCard icon={UserCheck} label="Pending approvals" value={val('pending_approvals')} color="bg-orange-100 text-orange-600" onClick={() => onNavChange('pending')} />
         <StatCard icon={Inbox} label="Pending token requests" value={loading ? '…' : (pendingTokenReqs ?? '—')} color="bg-teal-100 text-teal-600" />

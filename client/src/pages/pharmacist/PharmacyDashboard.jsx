@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ClipboardList, AlertTriangle, Pill } from 'lucide-react';
 import api from '../../api/axios';
-import { StatCard, AttentionRow } from '../../components/ui';
+import { StatCard, GaugeCard, AttentionRow } from '../../components/ui';
 
 export default function PharmacyDashboard({ onNavChange }) {
   const [stats, setStats] = useState({ pending: 0, lowStock: 0, medicines: 0 });
@@ -41,7 +41,14 @@ export default function PharmacyDashboard({ onNavChange }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard icon={ClipboardList} label="Pending dispenses" value={stats.pending} color="bg-amber-100 text-amber-600" onClick={() => onNavChange('dispense')} pulse={stats.pending > 0} />
-        <StatCard icon={AlertTriangle} label="Low-stock alerts" value={stats.lowStock} color="bg-red-100 text-red-600" onClick={() => onNavChange('lowstock')} />
+        <GaugeCard
+          value={stats.lowStock}
+          max={Math.max(stats.medicines, 1)}
+          label="Medicines below reorder level"
+          sub={stats.lowStock > 0 ? 'needs restocking' : 'stock healthy'}
+          color="#f43f5e"
+          onClick={() => onNavChange('lowstock')}
+        />
         <StatCard icon={Pill} label="Medicines in catalogue" value={stats.medicines} color="bg-sky-100 text-sky-600" onClick={() => onNavChange('stock')} />
       </div>
 
