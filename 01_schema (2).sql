@@ -1,4 +1,6 @@
--- MMCMS schema (PostgreSQL)
+-- schema for the medical centre database
+-- drop everything first so the file can be re-run from scratch
+
 DROP TABLE IF EXISTS token_request, app_user, ambulance_dispatch, ambulance, ward_admission, bed,
   test_order, diagnostic_test, medicine_dispense, prescription_item, medicine,
   prescription, visit, token, duty_roster, shift, health_card, patient, doctor, unit CASCADE;
@@ -43,11 +45,11 @@ CREATE TABLE patient (
                     CHECK (patient_category IN ('STUDENT','TEACHER','STAFF','FAMILY')),
   university_id     VARCHAR(20) UNIQUE,
   academic_dept     VARCHAR(60),
-  hall_name         VARCHAR(60),            -- attached DU hall (students). A student living off-campus has a home address but still an attached hall.
+  hall_name         VARCHAR(60),            -- students only: their attached hall
   guardian_id       INT REFERENCES patient(patient_id),
   registration_date DATE NOT NULL DEFAULT CURRENT_DATE,
-  photo_url         VARCHAR(255),           -- passport photo filename (uploaded by reception; served via a JWT-guarded endpoint)
-  -- A student is identified by their university ID, so it must be present.
+  photo_url         VARCHAR(255),           -- photo file uploaded at reception
+  -- a student always has a university id
   CONSTRAINT chk_student_has_id CHECK (patient_category <> 'STUDENT' OR university_id IS NOT NULL)
 );
 
@@ -80,6 +82,7 @@ CREATE TABLE duty_roster (
   UNIQUE (doctor_id, duty_date, shift_id)
 );
 
+-- no patient_id here on purpose, the patient is reachable through health_card
 CREATE TABLE token (
   token_id       SERIAL PRIMARY KEY,
   token_number   INT NOT NULL CHECK (token_number > 0),
@@ -109,8 +112,8 @@ CREATE TABLE visit (
   follow_up_date DATE
 );
 
--- A visit attached to a token must belong to that token's patient. A foreign
--- key can't express this cross-table rule, so a BEFORE trigger enforces it.
+-- a visit made against a token has to be for the same patient the token
+-- was issued to. can't say that with a foreign key, so trigger it is
 CREATE OR REPLACE FUNCTION trg_visit_token_patient_match() RETURNS trigger AS $$
 DECLARE
   tok_patient INT;
@@ -159,7 +162,7 @@ CREATE TABLE medicine (
 
 CREATE TABLE prescription_item (
   item_id             SERIAL PRIMARY KEY,
-  prescription_id     INT NOT NULL REFERENCES prescription(prescription_id),
+  prescription_id    INT NOT NULL REFERENCES prescription(prescription_id),
   medicine_id         INT NOT NULL REFERENCES medicine(medicine_id),
   dosage              VARCHAR(30),
   duration_days       INT CHECK (duration_days > 0),
@@ -168,6 +171,7 @@ CREATE TABLE prescription_item (
   UNIQUE (prescription_id, medicine_id)
 );
 
+-- patient not stored here either, chain is item -> prescription -> visit -> patient
 CREATE TABLE medicine_dispense (
   dispense_id          SERIAL PRIMARY KEY,
   prescription_item_id INT NOT NULL REFERENCES prescription_item(item_id),
@@ -188,6 +192,7 @@ CREATE TABLE diagnostic_test (
   available_days VARCHAR(50)
 );
 
+-- patient_id kept here because visit_id can be null (walk-in test without a visit)
 CREATE TABLE test_order (
   order_id            SERIAL PRIMARY KEY,
   visit_id            INT REFERENCES visit(visit_id),
@@ -203,6 +208,7 @@ CREATE TABLE test_order (
   remarks             TEXT
 );
 
+-- no is_occupied flag, occupancy comes from ward_admission
 CREATE TABLE bed (
   bed_id           SERIAL PRIMARY KEY,
   bed_number       VARCHAR(10) NOT NULL UNIQUE,
@@ -224,8 +230,7 @@ CREATE TABLE ward_admission (
   CHECK (discharge_datetime IS NULL OR discharge_datetime > admit_datetime)
 );
 
--- A bed can hold at most one ADMITTED patient at a time (discharged rows are
--- kept for history, so this is a partial unique index rather than a constraint).
+-- one admitted patient per bed at a time, discharged rows stay for history
 CREATE UNIQUE INDEX uq_bed_active_admission
   ON ward_admission (bed_id) WHERE status = 'ADMITTED';
 
@@ -258,6 +263,7 @@ CREATE TABLE ambulance_dispatch (
   CHECK (return_datetime IS NULL OR return_datetime > dispatch_datetime)
 );
 
+-- login table for the web app
 CREATE TABLE app_user (
   user_id            SERIAL PRIMARY KEY,
   username           VARCHAR(40) NOT NULL UNIQUE,
@@ -271,8 +277,8 @@ CREATE TABLE app_user (
   email_verified     BOOLEAN NOT NULL DEFAULT FALSE,
   is_active          BOOLEAN DEFAULT TRUE,
   created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  -- A login's role must match its linked record: DOCTOR -> doctor_id only,
-  -- PATIENT -> patient_id only, and pure-staff roles link to neither.
+  -- doctor logins point at a doctor row, patient logins at a patient row,
+  -- staff logins at neither
   CONSTRAINT chk_role_link CHECK (
     (role = 'DOCTOR'  AND doctor_id IS NOT NULL AND patient_id IS NULL) OR
     (role = 'PATIENT' AND patient_id IS NOT NULL AND doctor_id IS NULL) OR
@@ -280,6 +286,8 @@ CREATE TABLE app_user (
   )
 );
 
+-- online token requests, reviewed by reception (created after app_user
+-- because reviewed_by points there)
 CREATE TABLE token_request (
   request_id     SERIAL PRIMARY KEY,
   patient_id     INT NOT NULL REFERENCES patient(patient_id),

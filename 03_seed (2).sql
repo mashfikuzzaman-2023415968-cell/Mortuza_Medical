@@ -1,11 +1,9 @@
--- =====================================================================
--- MMCMS sample data  (PostgreSQL)
--- Doctors/staff = real names from DU Medical Centre roster & staff list.
--- Patients = fictional (medical patient data is never real for privacy).
--- Explicit IDs are used for stable FK references; sequences reset at end.
--- =====================================================================
+-- sample data for the medical centre db
+-- doctor names come from the actual DU medical centre roster, patients are
+-- all made up. ids are written out by hand so the foreign keys below line up,
+-- and the sequences get bumped at the bottom.
 
--- ---------- 1. UNIT ----------
+-- units
 INSERT INTO unit (unit_id, unit_name, unit_type, floor_location, contact_ext) VALUES
  (1,'Outpatient (Male)','OUTPATIENT','Ground Floor','4236'),
  (2,'Outpatient (Female & Child)','OUTPATIENT','Ground Floor','4237'),
@@ -16,8 +14,7 @@ INSERT INTO unit (unit_id, unit_name, unit_type, floor_location, contact_ext) VA
  (7,'Pathology Lab','PATHOLOGY','Ground Floor','4244'),
  (8,'Radiology (X-ray/USG)','RADIOLOGY','Ground Floor','4245');
 
--- ---------- 2. DOCTOR ----------
--- Real names. bmdc_reg_no synthetic (not published); phones from staff list where available.
+-- doctors (real names, bmdc numbers are made up since those aren't public)
 INSERT INTO doctor (doctor_id, full_name, gender, bmdc_reg_no, designation, specialization, doctor_type, is_parttime, phone, email, unit_id, joining_date) VALUES
  (1 ,'Dr. Mohammad Tanvir Ali','M','BMDC-A1001','Chief Medical Officer','General Medicine','GENERAL',FALSE,'01772133301','cmo.dumc@gmail.com',1,'2005-03-01'),
  (2 ,'Mrs. Razia Rahman','F','BMDC-A1002','Senior Medical Officer','General Medicine','GENERAL',FALSE,'01817516559','raziarahman1973@gmail.com',2,'2008-07-15'),
@@ -49,13 +46,13 @@ INSERT INTO doctor (doctor_id, full_name, gender, bmdc_reg_no, designation, spec
  (28,'Dr. Monirul Islam','M','BMDC-A1028','Part-time Medical Officer','Radiology','SPECIALIST',TRUE,'01912999116',NULL,8,'2015-06-01'),
  (29,'Dr. Nargis Fatema','F','BMDC-A1029','Senior Medical Officer','Pathology','SPECIALIST',FALSE,'01713045169',NULL,7,'2009-03-03'),
  (30,'Dr. Rakhi Pal','F','BMDC-A1030','Part-time Medical Officer','General Medicine','GENERAL',TRUE,'01819810801',NULL,2,'2017-01-01'),
--- Homeo Unit doctors: names not published in the provided sources -> representative entries.
+-- couldn't find the homeo doctors' names anywhere, so these four are placeholders
  (31,'Dr. Aminul Haque (Homeo)','M','BMDC-H2001','Homeo Medical Officer','Homeopathy','HOMEO',FALSE,'01700000031',NULL,5,'2012-01-01'),
  (32,'Dr. Sufia Khatun (Homeo)','F','BMDC-H2002','Homeo Medical Officer','Homeopathy','HOMEO',FALSE,'01700000032',NULL,5,'2013-01-01'),
  (33,'Dr. Jamal Uddin (Homeo)','M','BMDC-H2003','Homeo Medical Officer','Homeopathy','HOMEO',FALSE,'01700000033',NULL,5,'2014-01-01'),
  (34,'Dr. Nasrin Akter (Homeo)','F','BMDC-H2004','Homeo Medical Officer','Homeopathy','HOMEO',FALSE,'01700000034',NULL,5,'2015-01-01');
 
--- ---------- 3. PATIENT (fictional) ----------
+-- patients (all fictional)
 INSERT INTO patient (patient_id, full_name, date_of_birth, gender, blood_group, phone, email, address, patient_category, university_id, academic_dept, guardian_id, registration_date) VALUES
  (1 ,'Rakibul Hasan','2003-05-12','M','O+','01710000001','rakib@example.com','Jagannath Hall, DU','STUDENT','BSc-CSE-2101','Computer Science & Engineering',NULL,'2025-01-10'),
  (2 ,'Sadia Afrin','2002-11-23','F','A+','01710000002','sadia@example.com','Rokeya Hall, DU','STUDENT','BSc-EEE-2055','Electrical & Electronic Engineering',NULL,'2025-01-11'),
@@ -73,19 +70,17 @@ INSERT INTO patient (patient_id, full_name, date_of_birth, gender, blood_group, 
  (14,'Abdul Karim','1970-02-28','M','O+','01730000014',NULL,'Palashi Staff Qtr, DU','STAFF','EMP-S-5001','Administration',NULL,'2024-10-01'),
  (15,'Rahima Khatun','1980-07-19','F','A-','01730000015',NULL,'Palashi Staff Qtr, DU','STAFF','EMP-S-5023','Library',NULL,'2024-10-02'),
  (16,'Jasim Uddin','1978-11-11','M','B-','01730000016',NULL,'Nilkhet Staff Qtr, DU','STAFF','EMP-S-5044','Transport',NULL,'2024-10-03'),
- -- Family members (dependents) -> guardian_id points to a teacher/staff
+ -- dependents, guardian_id points at a teacher/staff row above
  (17,'Ayesha Kamrul','1972-03-30','F','O+','01720000017',NULL,'Fuller Road, Dhaka','FAMILY',NULL,NULL,11,'2024-09-05'),
  (18,'Sabbir Kamrul','2005-09-09','M','O+','01720000018',NULL,'Fuller Road, Dhaka','FAMILY',NULL,NULL,11,'2024-09-05'),
  (19,'Rezaul Karim','2008-12-12','M','O+',NULL,NULL,'Palashi Staff Qtr, DU','FAMILY',NULL,NULL,14,'2024-10-05'),
  (20,'Salma Mizan','1978-06-06','F','B+','01720000020',NULL,'Azimpur, Dhaka','FAMILY',NULL,NULL,13,'2024-09-06');
 
--- Attached DU hall for students (Part II). Seed students live in their hall, so
--- hall_name is derived from the hall address; a student living off-campus would
--- keep a home address while reception records the attached hall here.
+-- the seed students all live in halls, so pull the hall name out of the address
 UPDATE patient SET hall_name = TRIM(REPLACE(address, ', DU', ''))
   WHERE patient_category = 'STUDENT' AND address ILIKE '%hall%';
 
--- ---------- 4. HEALTH_CARD ----------
+-- health cards, one per patient. a couple are expired/suspended on purpose
 INSERT INTO health_card (card_id, card_number, patient_id, issue_date, expiry_date, photo_submitted, status) VALUES
  (1 ,'HC-2025-0001',1 ,'2025-01-10','2027-01-10',TRUE ,'ACTIVE'),
  (2 ,'HC-2025-0002',2 ,'2025-01-11','2027-01-11',TRUE ,'ACTIVE'),
@@ -95,8 +90,8 @@ INSERT INTO health_card (card_id, card_number, patient_id, issue_date, expiry_da
  (6 ,'HC-2025-0006',6 ,'2025-02-01','2027-02-01',TRUE ,'ACTIVE'),
  (7 ,'HC-2025-0007',7 ,'2025-02-02','2027-02-02',TRUE ,'ACTIVE'),
  (8 ,'HC-2025-0008',8 ,'2025-02-03','2027-02-03',TRUE ,'ACTIVE'),
- (9 ,'HC-2024-0009',9 ,'2024-02-04','2026-02-04',TRUE ,'ACTIVE'),  -- expiry just past 'today' -> Q19 will flip
- (10,'HC-2024-0010',10,'2024-02-05','2026-05-01',TRUE ,'ACTIVE'),  -- expired by date, still ACTIVE
+ (9 ,'HC-2024-0009',9 ,'2024-02-04','2026-02-04',TRUE ,'ACTIVE'),  -- past expiry, the update query catches this one
+ (10,'HC-2024-0010',10,'2024-02-05','2026-05-01',TRUE ,'ACTIVE'),  -- same, expired by date but still says ACTIVE
  (11,'HC-2024-0011',11,'2024-09-01','2026-09-01',TRUE ,'ACTIVE'),
  (12,'HC-2024-0012',12,'2024-09-02','2026-09-02',TRUE ,'ACTIVE'),
  (13,'HC-2024-0013',13,'2024-09-03','2026-09-03',TRUE ,'SUSPENDED'),
@@ -108,7 +103,7 @@ INSERT INTO health_card (card_id, card_number, patient_id, issue_date, expiry_da
  (19,'HC-2024-0019',19,'2024-10-05','2026-10-05',TRUE ,'ACTIVE'),
  (20,'HC-2024-0020',20,'2024-09-06','2026-09-06',TRUE ,'ACTIVE');
 
--- ---------- 5. SHIFT ----------
+-- shifts (friday ones run on different hours)
 INSERT INTO shift (shift_id, shift_name, start_time, end_time) VALUES
  (1,'Morning','08:00','13:00'),
  (2,'Afternoon','13:00','18:00'),
@@ -116,48 +111,46 @@ INSERT INTO shift (shift_id, shift_name, start_time, end_time) VALUES
  (4,'Friday Morning','08:30','12:30'),
  (5,'Friday Afternoon','15:30','20:30');
 
--- ---------- 6. DUTY_ROSTER ----------
--- Generated RELATIVE to CURRENT_DATE so the "doctors available now" feature and
--- the Friday shifts always have live data on any clone/deploy, on any day it is
--- loaded. roster_id is left to SERIAL. (M=1,4,7,8,9,10,11,12,14 · F=2,6,13)
---
--- (a) Current week, Sunday–Thursday (offsets 0..4 from this week's Sunday).
+-- duty roster. dates are relative to CURRENT_DATE so there are always doctors
+-- on duty whenever this seed gets loaded, otherwise the "available now" page
+-- would be empty on demo day. roster_id left to the sequence.
+
+-- this week, sun to thu
 INSERT INTO duty_roster (doctor_id, shift_id, unit_id, duty_date, is_oncall)
 SELECT v.doctor_id, v.shift_id, v.unit_id,
        CURRENT_DATE - EXTRACT(DOW FROM CURRENT_DATE)::int + v.day_off,
        v.is_oncall
 FROM (VALUES
-  (1 ,1,1,0,FALSE),(6 ,1,2,0,FALSE),(4 ,2,1,0,FALSE),(13,2,2,0,FALSE),(10,3,1,0,TRUE ),  -- Sun
-  (3 ,1,1,1,FALSE),(2 ,1,2,1,FALSE),(5 ,2,1,1,FALSE),(9 ,3,1,1,FALSE),                    -- Mon
-  (8 ,1,1,2,FALSE),(13,1,2,2,FALSE),(7 ,2,1,2,FALSE),(11,3,1,2,TRUE ),                    -- Tue
-  (1 ,1,1,3,FALSE),(6 ,2,2,3,FALSE),(12,2,1,3,FALSE),(14,3,1,3,FALSE),                    -- Wed
-  (4 ,1,1,4,FALSE),(2 ,1,2,4,FALSE),(9 ,2,1,4,FALSE),(10,3,1,4,FALSE)                     -- Thu
+  (1 ,1,1,0,FALSE),(6 ,1,2,0,FALSE),(4 ,2,1,0,FALSE),(13,2,2,0,FALSE),(10,3,1,0,TRUE ),  -- sun
+  (3 ,1,1,1,FALSE),(2 ,1,2,1,FALSE),(5 ,2,1,1,FALSE),(9 ,3,1,1,FALSE),                    -- mon
+  (8 ,1,1,2,FALSE),(13,1,2,2,FALSE),(7 ,2,1,2,FALSE),(11,3,1,2,TRUE ),                    -- tue
+  (1 ,1,1,3,FALSE),(6 ,2,2,3,FALSE),(12,2,1,3,FALSE),(14,3,1,3,FALSE),                    -- wed
+  (4 ,1,1,4,FALSE),(2 ,1,2,4,FALSE),(9 ,2,1,4,FALSE),(10,3,1,4,FALSE)                     -- thu
 ) AS v(doctor_id, shift_id, unit_id, day_off, is_oncall)
 ON CONFLICT (doctor_id, duty_date, shift_id) DO NOTHING;
 
--- (b) Upcoming Friday (or today, if today is Friday) — uses the Friday shifts.
+-- the coming friday, on the friday shifts
 INSERT INTO duty_roster (doctor_id, shift_id, unit_id, duty_date, is_oncall)
 SELECT v.doctor_id, v.shift_id, v.unit_id,
        CURRENT_DATE + ((5 - EXTRACT(DOW FROM CURRENT_DATE)::int + 7) % 7)::int,
        v.is_oncall
 FROM (VALUES
-  (1 ,4,1,FALSE),(6 ,4,2,FALSE),   -- Friday Morning
-  (4 ,5,1,FALSE),(13,5,2,FALSE),   -- Friday Afternoon
-  (10,3,1,TRUE )                   -- Night (overnight cover, on-call)
+  (1 ,4,1,FALSE),(6 ,4,2,FALSE),   -- friday morning
+  (4 ,5,1,FALSE),(13,5,2,FALSE),   -- friday afternoon
+  (10,3,1,TRUE )                   -- night cover, on call
 ) AS v(doctor_id, shift_id, unit_id, is_oncall)
 ON CONFLICT (doctor_id, duty_date, shift_id) DO NOTHING;
 
--- (c) Guarantee TODAY has full Morning+Afternoon+Night coverage + an on-call, so
---     "available now" returns doctors at any hour on the demo day (any weekday).
+-- and make sure today itself is covered morning/afternoon/night + an on-call
 INSERT INTO duty_roster (doctor_id, shift_id, unit_id, duty_date, is_oncall)
 VALUES
-  (1 ,1,1,CURRENT_DATE,FALSE),(6 ,1,2,CURRENT_DATE,FALSE),   -- Morning (M+F)
-  (4 ,2,1,CURRENT_DATE,FALSE),(2 ,2,2,CURRENT_DATE,FALSE),   -- Afternoon (M+F)
-  (10,3,1,CURRENT_DATE,FALSE),(13,3,2,CURRENT_DATE,FALSE),   -- Night (M+F)
-  (7 ,1,1,CURRENT_DATE,TRUE )                                -- on-call today
+  (1 ,1,1,CURRENT_DATE,FALSE),(6 ,1,2,CURRENT_DATE,FALSE),
+  (4 ,2,1,CURRENT_DATE,FALSE),(2 ,2,2,CURRENT_DATE,FALSE),
+  (10,3,1,CURRENT_DATE,FALSE),(13,3,2,CURRENT_DATE,FALSE),
+  (7 ,1,1,CURRENT_DATE,TRUE )
 ON CONFLICT (doctor_id, duty_date, shift_id) DO NOTHING;
 
--- ---------- 7. TOKEN (patient derived via health_card) ----------
+-- tokens (no patient column here, the card links to the patient)
 INSERT INTO token (token_id, token_number, health_card_id, unit_id, issue_datetime, token_date, status) VALUES
  (1 ,1,1 ,1,'2026-01-04 08:20','2026-01-04','SERVED'),
  (2 ,2,3 ,1,'2026-01-04 08:35','2026-01-04','SERVED'),
@@ -178,7 +171,7 @@ INSERT INTO token (token_id, token_number, health_card_id, unit_id, issue_dateti
  (17,1,10,1,'2026-01-07 09:30','2026-01-07','SERVED'),
  (18,1,20,2,'2026-01-08 08:45','2026-01-08','WAITING');
 
--- ---------- 8. VISIT (some EMERGENCY have NULL token) ----------
+-- visits. the two emergencies came in at night without any token
 INSERT INTO visit (visit_id, token_id, patient_id, doctor_id, visit_datetime, visit_type, chief_complaint, diagnosis, blood_pressure, temperature_f, weight_kg, pulse, follow_up_date) VALUES
  (1 ,1 ,1 ,4 ,'2026-01-04 08:50','NEW','Fever and headache for 3 days','Viral fever','110/70',101.4,62.50,88,'2026-01-09'),
  (2 ,2 ,3 ,4 ,'2026-01-04 09:00','NEW','Sore throat, cough','Acute pharyngitis','115/75',100.2,68.00,80,NULL),
@@ -195,7 +188,7 @@ INSERT INTO visit (visit_id, token_id, patient_id, doctor_id, visit_datetime, vi
  (13,NULL,16,7 ,'2026-01-07 23:40','EMERGENCY','Severe abdominal pain at night','Renal colic','135/88',99.2,78.00,96,NULL),
  (14,NULL,19,13,'2026-01-08 02:15','EMERGENCY','High fever in child','Febrile illness','100/60',103.1,32.00,110,'2026-01-09');
 
--- ---------- 9. MEDICINE ----------
+-- dispensary stock
 INSERT INTO medicine (medicine_id, medicine_name, generic_name, manufacturer, dosage_form, strength, unit_price, stock_quantity, reorder_level, expiry_date, is_homeo) VALUES
  (1 ,'Napa','Paracetamol','Beximco','TABLET','500mg',1.20,5000,500,'2027-06-30',FALSE),
  (2 ,'Ace','Paracetamol','Square','TABLET','500mg',1.50,300,500,'2027-03-31',FALSE),  -- below reorder
@@ -217,14 +210,14 @@ INSERT INTO medicine (medicine_id, medicine_name, generic_name, manufacturer, do
  (18,'Diclofen','Diclofenac','Square','TABLET','50mg',1.80,2200,300,'2027-03-31',FALSE),
  (19,'Tory','Etoricoxib','Beximco','TABLET','90mg',15.00,500,100,'2026-12-31',FALSE),
  (20,'Filmet','Metronidazole','Beximco','TABLET','400mg',2.40,1900,300,'2027-02-28',FALSE),
- -- Homeo medicines (always free)
+ -- homeo stock, always free
  (21,'Arnica Montana','Arnica Montana','Homeo Lab','DROPS','30C',0.00,400,50,'2027-12-31',TRUE),
  (22,'Nux Vomica','Nux Vomica','Homeo Lab','DROPS','30C',0.00,400,50,'2027-12-31',TRUE),
  (23,'Belladonna','Belladonna','Homeo Lab','DROPS','30C',0.00,350,50,'2027-12-31',TRUE),
  (24,'Rhus Tox','Rhus Toxicodendron','Homeo Lab','DROPS','30C',0.00,300,50,'2027-12-31',TRUE),
  (25,'Bryonia Alba','Bryonia Alba','Homeo Lab','DROPS','30C',0.00,300,50,'2027-12-31',TRUE);
 
--- ---------- 10. PRESCRIPTION ----------
+-- prescriptions
 INSERT INTO prescription (prescription_id, visit_id, doctor_id, prescription_date, advice, next_visit_date) VALUES
  (1 ,1 ,4 ,'2026-01-04','Plenty of fluids and rest','2026-01-09'),
  (2 ,2 ,4 ,'2026-01-04','Warm saline gargle',NULL),
@@ -239,7 +232,7 @@ INSERT INTO prescription (prescription_id, visit_id, doctor_id, prescription_dat
  (11,11,2 ,'2026-01-06','Steam inhalation','2026-01-13'),
  (12,12,31,'2026-01-07','Homeopathic course',  '2026-01-21');
 
--- ---------- 11. PRESCRIPTION_ITEM ----------
+-- prescription line items
 INSERT INTO prescription_item (item_id, prescription_id, medicine_id, dosage, duration_days, quantity_prescribed, instruction) VALUES
  (1 ,1 ,1 ,'1+1+1',5,15,'After meal'),
  (2 ,1 ,5 ,'0+0+1',5,5 ,'At night'),
@@ -261,22 +254,21 @@ INSERT INTO prescription_item (item_id, prescription_id, medicine_id, dosage, du
  (18,12,21,'5 drops x2',15,1,'In water'),
  (19,12,24,'5 drops x2',15,1,'In water');
 
--- ---------- 12. MEDICINE_DISPENSE (patient derived via item->prescription->visit) ----------
--- Students & homeo = 0 charge; teachers/staff/family = cost price * qty.
+-- dispenses. students and homeo are free, teacher/staff/family pay cost price
 INSERT INTO medicine_dispense (dispense_id, prescription_item_id, dispensed_quantity, dispense_datetime, charged_amount, dispensed_by) VALUES
- (1 ,1 ,15,'2026-01-04 09:10',0.00 ,'Md. Rubel Mahmud'),     -- student (v1, p1) free
+ (1 ,1 ,15,'2026-01-04 09:10',0.00 ,'Md. Rubel Mahmud'),     -- student, free
  (2 ,2 ,5 ,'2026-01-04 09:10',0.00 ,'Md. Rubel Mahmud'),
- (3 ,3 ,14,'2026-01-04 09:20',0.00 ,'Mst. Fahima Akter'),    -- student (v2, p3) free
- (4 ,5 ,14,'2026-01-04 09:45',0.00 ,'Mst. Fahima Akter'),    -- student (v3, p2) free
- (5 ,10,15,'2026-01-05 09:35',0.00 ,'Bisawjit Talukdar'),    -- student (v7, p7) free
- (6 ,13,9 ,'2026-01-05 10:10',0.00 ,'Md. Rubel Mahmud'),     -- student (v9, p9) free
- (7 ,15,30,'2026-01-06 10:40',225.00,'Md. Rubel Mahmud'),    -- teacher (v10, p11): 30 * 7.50
- (8 ,16,7 ,'2026-01-06 10:55',49.00 ,'Mst. Fahima Akter'),   -- teacher (v11, p12): 7 * 7.00
- (9 ,17,10,'2026-01-06 10:55',120.00,'Mst. Fahima Akter'),   -- teacher (v11, p12): 10 * 12.00
- (10,18,1 ,'2026-01-07 09:05',0.00 ,'Md. Rubel Mahmud'),     -- homeo free (v12, staff p14)
+ (3 ,3 ,14,'2026-01-04 09:20',0.00 ,'Mst. Fahima Akter'),    -- student, free
+ (4 ,5 ,14,'2026-01-04 09:45',0.00 ,'Mst. Fahima Akter'),    -- student, free
+ (5 ,10,15,'2026-01-05 09:35',0.00 ,'Bisawjit Talukdar'),    -- student, free
+ (6 ,13,9 ,'2026-01-05 10:10',0.00 ,'Md. Rubel Mahmud'),     -- student, free
+ (7 ,15,30,'2026-01-06 10:40',225.00,'Md. Rubel Mahmud'),    -- teacher, 30 x 7.50
+ (8 ,16,7 ,'2026-01-06 10:55',49.00 ,'Mst. Fahima Akter'),   -- teacher, 7 x 7.00
+ (9 ,17,10,'2026-01-06 10:55',120.00,'Mst. Fahima Akter'),   -- teacher, 10 x 12.00
+ (10,18,1 ,'2026-01-07 09:05',0.00 ,'Md. Rubel Mahmud'),     -- homeo, free even for staff
  (11,19,1 ,'2026-01-07 09:05',0.00 ,'Md. Rubel Mahmud');
 
--- ---------- 13. DIAGNOSTIC_TEST ----------
+-- test catalogue (all free at the centre)
 INSERT INTO diagnostic_test (test_id, test_name, test_category, sample_type, price, normal_range, available_days) VALUES
  (1 ,'CBC','PATHOLOGY','Blood',0.00,'WBC 4-11 x10^9/L','SAT-THU'),
  (2 ,'PBF','PATHOLOGY','Blood',0.00,'-','SAT-THU'),
@@ -294,7 +286,7 @@ INSERT INTO diagnostic_test (test_id, test_name, test_category, sample_type, pri
  (14,'ECG','ECG',NULL,0.00,'-','SAT-THU'),
  (15,'Ultrasonogram W/A','ULTRASOUND',NULL,0.00,'-','TUE,WED,THU');
 
--- ---------- 14. TEST_ORDER ----------
+-- test orders, mixed statuses
 INSERT INTO test_order (order_id, visit_id, patient_id, test_id, ordered_by, order_datetime, sample_collected_at, status, result_value, result_date, remarks) VALUES
  (1 ,5 ,5 ,1 ,3 ,'2026-01-05 08:45','2026-01-05 09:30','COMPLETED','Hb 9.8 g/dL (low)','2026-01-05','Anaemia confirmed'),
  (2 ,5 ,5 ,2 ,3 ,'2026-01-05 08:45','2026-01-05 09:30','COMPLETED','Microcytic hypochromic','2026-01-05',NULL),
@@ -309,7 +301,7 @@ INSERT INTO test_order (order_id, visit_id, patient_id, test_id, ordered_by, ord
  (11,6 ,6 ,3 ,13,'2026-01-05 09:00',NULL,'CANCELLED',NULL,NULL,'Patient declined'),
  (12,12,14,12,31,'2026-01-07 08:55','2026-01-07 09:20','COMPLETED','5.9% (pre-diabetic)','2026-01-07',NULL);
 
--- ---------- 15. BED (30 isolation beds; occupancy is derived, not stored) ----------
+-- 30 isolation beds
 INSERT INTO bed (bed_id, bed_number, ward_type, disease_category)
 SELECT g,
        'ISO-' || lpad(g::text,2,'0'),
@@ -317,7 +309,7 @@ SELECT g,
        CASE WHEN g<=10 THEN 'Chicken Pox' WHEN g<=20 THEN 'Mumps' ELSE 'General Contagious' END
 FROM generate_series(1,30) g;
 
--- ---------- 16. WARD_ADMISSION ----------
+-- admissions, a few still admitted
 INSERT INTO ward_admission (admission_id, patient_id, bed_id, attending_doctor_id, admit_datetime, discharge_datetime, disease, status) VALUES
  (1,3 ,1 ,4 ,'2026-01-02 11:00','2026-01-06 10:00','Chicken Pox','DISCHARGED'),
  (2,8 ,2 ,6 ,'2026-01-05 12:00',NULL,'Chicken Pox','ADMITTED'),
@@ -326,15 +318,13 @@ INSERT INTO ward_admission (admission_id, patient_id, bed_id, attending_doctor_i
  (5,9 ,3 ,7 ,'2026-01-05 14:00',NULL,'Chicken Pox','ADMITTED'),
  (6,4 ,4 ,2 ,'2026-01-01 10:00','2026-01-04 10:00','Measles','DISCHARGED');
 
--- (bed occupancy is now derived from ward_admission via the v_bed_occupancy view)
-
--- ---------- 17. AMBULANCE (the centre operates two ambulances) ----------
--- Reg/driver details are representative (not published); emergency mobile 01798762920 is real.
+-- the centre runs two ambulances. reg numbers and drivers are representative,
+-- the emergency number 01798762920 is the real one
 INSERT INTO ambulance (ambulance_id, registration_no, model, capacity, driver_name, driver_phone, status) VALUES
  (1,'Dhaka Metro-Ga-13-2045','Toyota Hiace',2,'Md. Jashim Uddin','01798762920','IN_SERVICE'),
  (2,'Dhaka Metro-Ga-11-7788','Nissan Urvan',2,'Md. Sohel Rana','01711000022','MAINTENANCE');
 
--- ---------- 18. AMBULANCE_DISPATCH (trip log; patient/authorizer may be NULL) ----------
+-- trip log, patient/authorizer can be null for outside calls
 INSERT INTO ambulance_dispatch (dispatch_id, ambulance_id, patient_id, authorized_by, dispatch_datetime, return_datetime, origin, destination, trip_type, requested_by, status, remarks) VALUES
  (1,1,16,7 ,'2026-01-07 23:55','2026-01-08 01:30','Medical Centre','Dhaka Medical College Hospital','EMERGENCY','Night duty MO','COMPLETED','Renal colic transfer'),
  (2,1,19,13,'2026-01-08 02:30','2026-01-08 03:45','Medical Centre','BSMMU','EMERGENCY','Night duty MO','COMPLETED','Child high fever'),
@@ -343,9 +333,8 @@ INSERT INTO ambulance_dispatch (dispatch_id, ambulance_id, patient_id, authorize
  (5,1,NULL,7 ,'2026-01-09 09:15',NULL,'Medical Centre','Holy Family Hospital','EMERGENCY','Emergency desk','DISPATCHED','Currently on call'),
  (6,2,3 ,4 ,'2026-01-02 11:20',NULL,'Medical Centre','Birdem Hospital','REFERRAL','Hall authority (call slip)','CANCELLED','Patient declined transfer');
 
--- ---------- 19. APP_USER (passwords are placeholder bcrypt hashes) ----------
--- email_verified = TRUE for seed users so login works immediately.
--- In production, new users start with email_verified = FALSE until they click the verification link.
+-- logins. hashes are placeholders (real ones get set through the app),
+-- email_verified is TRUE here so the seed users can log in right away
 INSERT INTO app_user (user_id, username, password_hash, role, doctor_id, patient_id, email, verification_token, email_verified, is_active) VALUES
  (1,'mashfikuzzaman','$2b$10$placeholderhashadminxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx','ADMIN',NULL,NULL,'mashfikuzzaman-2023415968@cs.du.ac.bd',NULL,TRUE,TRUE),
  (2,'dr.tanvir',   '$2b$10$placeholderhashdoc1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx','DOCTOR',1,NULL,'cmo.dumc@gmail.com',NULL,TRUE,TRUE),
@@ -355,7 +344,7 @@ INSERT INTO app_user (user_id, username, password_hash, role, doctor_id, patient
  (6,'lab.faruque', '$2b$10$placeholderhashlabxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx','LAB_TECH',NULL,NULL,'faruque355.du@gmail.com',NULL,TRUE,TRUE),
  (7,'patient.rakib','$2b$10$placeholderhashpat1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx','PATIENT',NULL,1,'rakib@example.com',NULL,TRUE,TRUE);
 
--- ---------- reset all sequences so future inserts don't collide ----------
+-- bump every sequence past the hand-written ids
 SELECT setval('unit_unit_id_seq',             (SELECT MAX(unit_id) FROM unit));
 SELECT setval('doctor_doctor_id_seq',         (SELECT MAX(doctor_id) FROM doctor));
 SELECT setval('patient_patient_id_seq',       (SELECT MAX(patient_id) FROM patient));
@@ -376,7 +365,7 @@ SELECT setval('ambulance_ambulance_id_seq',   (SELECT MAX(ambulance_id) FROM amb
 SELECT setval('ambulance_dispatch_dispatch_id_seq',(SELECT MAX(dispatch_id) FROM ambulance_dispatch));
 SELECT setval('app_user_user_id_seq',         (SELECT MAX(user_id) FROM app_user));
 
--- ---------- token_request ----------
+-- online token requests, one of each state
 INSERT INTO token_request (request_id, patient_id, unit_id, preferred_date, reason, status, reject_reason, created_at, reviewed_by, reviewed_at, token_id) VALUES
  (1, 1, 1, '2026-01-04', 'Fever and headache for 3 days', 'APPROVED', NULL, '2026-01-03 20:00', 4, '2026-01-04 07:50', 1),
  (2, 4, 2, '2026-01-04', 'Recurring migraine', 'APPROVED', NULL, '2026-01-03 21:00', 4, '2026-01-04 07:55', 4),

@@ -46,10 +46,15 @@ HAVING COUNT(v.visit_id) > ALL (
   WHERE d2.doctor_type = 'HOMEO'
   GROUP BY d2.doctor_id);
 
--- Q8 ANY/SOME: medicines priced above ANY homeo medicine
+-- Q8 ANY: medicines priced above ANY homeo medicine
 SELECT medicine_name, unit_price
 FROM medicine
 WHERE unit_price > ANY (SELECT unit_price FROM medicine WHERE is_homeo = TRUE);
+
+-- Q8b SOME (synonym of ANY): medicines cheaper than some antibiotic
+SELECT medicine_name, unit_price
+FROM medicine
+WHERE unit_price < SOME (SELECT unit_price FROM medicine WHERE generic_name IN ('Azithromycin','Cefixime'));
 
 -- Q9 EXISTS: patients with at least one test ordered
 SELECT p.full_name, p.patient_category
@@ -179,3 +184,20 @@ GROUP BY a.ambulance_id, a.registration_no, a.status
 ORDER BY trips DESC;
 
 SELECT * FROM v_ambulance_status;
+
+-- Q23 online token requests: review outcome per request, with the reviewer
+-- and (if approved) the token that got issued. CASE + multi-join + LEFT JOINs
+SELECT tr.request_id, p.full_name AS patient, un.unit_name, tr.preferred_date,
+       tr.status,
+       CASE tr.status
+         WHEN 'APPROVED' THEN 'Token #' || t.token_number
+         WHEN 'REJECTED' THEN tr.reject_reason
+         ELSE 'Awaiting review'
+       END AS outcome,
+       au.username AS reviewed_by
+FROM token_request tr
+JOIN patient p  ON p.patient_id = tr.patient_id
+JOIN unit un    ON un.unit_id = tr.unit_id
+LEFT JOIN token t    ON t.token_id = tr.token_id
+LEFT JOIN app_user au ON au.user_id = tr.reviewed_by
+ORDER BY tr.request_id;

@@ -858,7 +858,7 @@ original set: the schema is simultaneously **lossless-join, BCNF, and dependency
 
 ---
 
-## 8. Queries (`db/05_queries.sql`) — 22 queries covering every 8.g criterion
+## 8. Queries (`db/05_queries.sql`) — 24 queries covering every 8.g criterion
 
 Each query below gives: **(a)** the question, **(b)** relational algebra, **(c)** SQL.
 RA symbols: σ select, π project, ⋈ natural/theta join, ⟕/⟗ left/full outer join, × cross product,
@@ -929,11 +929,18 @@ HAVING COUNT(v.visit_id) > ALL (
 );
 ```
 
-**Q8 — Subquery with ANY / SOME.** *Medicines priced above ANY homeo medicine.*
+**Q8 — Subquery with ANY.** *Medicines priced above ANY homeo medicine.*
 ```sql
 SELECT medicine_name, unit_price
 FROM medicine
 WHERE unit_price > ANY (SELECT unit_price FROM medicine WHERE is_homeo = TRUE);
+```
+
+**Q8b — Subquery with SOME** (synonym of ANY). *Medicines cheaper than some antibiotic.*
+```sql
+SELECT medicine_name, unit_price
+FROM medicine
+WHERE unit_price < SOME (SELECT unit_price FROM medicine WHERE generic_name IN ('Azithromycin','Cefixime'));
 ```
 
 **Q9 — EXISTS.** *Patients who have at least one diagnostic test ordered.*
@@ -998,22 +1005,23 @@ GROUP BY p.patient_id, p.full_name
 HAVING SUM(md.charged_amount) > (SELECT AVG(charged_amount) FROM medicine_dispense);
 ```
 
-**Q15 — GROUP BY + HAVING + ORDER BY.** *Units that issued more than 5 tokens, busiest first.*
-RA: `τ_{cnt desc} ( σ_{cnt>5} ( 𝒢_{unit_id; count→cnt} token ) )`
+**Q15 — GROUP BY + HAVING + ORDER BY.** *Units that issued more than 2 tokens, busiest first.*
+RA: `τ_{cnt desc} ( σ_{cnt>2} ( 𝒢_{unit_id; count→cnt} token ) )`
 ```sql
 SELECT u.unit_name, COUNT(*) AS token_count
 FROM token t JOIN unit u USING (unit_id)
 GROUP BY u.unit_id, u.unit_name
-HAVING COUNT(*) > 5
+HAVING COUNT(*) > 2
 ORDER BY token_count DESC;
 ```
 
-**Q16 — WITH clause (CTE).** *Top-3 busiest doctors by visits this month.*
+**Q16 — WITH clause (CTE).** *Top-3 busiest doctors by visits in the seed month (fixed date so the snapshot is reproducible).*
 ```sql
 WITH monthly_visits AS (
   SELECT doctor_id, COUNT(*) AS visits
   FROM visit
-  WHERE visit_datetime >= date_trunc('month', CURRENT_DATE)
+  WHERE visit_datetime >= date_trunc('month', DATE '2026-01-15')
+    AND visit_datetime <  date_trunc('month', DATE '2026-01-15') + INTERVAL '1 month'
   GROUP BY doctor_id
 )
 SELECT d.full_name, mv.visits
@@ -1057,14 +1065,14 @@ FROM token t JOIN health_card hc ON t.health_card_id = hc.card_id;
 ```sql
 UPDATE health_card
 SET status = 'EXPIRED'
-WHERE expiry_date < CURRENT_DATE AND status = 'ACTIVE';
+WHERE expiry_date < DATE '2026-05-31' AND status = 'ACTIVE';
 ```
 
 **Q20 — DELETE (DML).** *Purge cancelled tokens older than 30 days.*
 ```sql
 DELETE FROM token
 WHERE status = 'CANCELLED'
-  AND token_date < CURRENT_DATE - INTERVAL '30 days';
+  AND token_date < DATE '2026-05-31' - INTERVAL '30 days';
 ```
 
 **Q21 — Aggregate suite.** *Dispensary financial summary (COUNT, SUM, AVG, MIN, MAX, COALESCE).*
@@ -1091,7 +1099,26 @@ GROUP BY a.ambulance_id, a.registration_no, a.status
 ORDER BY trips DESC;
 ```
 
-> That is **22 queries**, comfortably above the required 15, and every sub-item of 8.g
+**Q23 — Online token requests.** *Review outcome per request with reviewer and issued token*
+(CASE expression + multi-join + LEFT JOINs across `token_request`, `patient`, `unit`, `token`, `app_user`).
+```sql
+SELECT tr.request_id, p.full_name AS patient, un.unit_name, tr.preferred_date,
+       tr.status,
+       CASE tr.status
+         WHEN 'APPROVED' THEN 'Token #' || t.token_number
+         WHEN 'REJECTED' THEN tr.reject_reason
+         ELSE 'Awaiting review'
+       END AS outcome,
+       au.username AS reviewed_by
+FROM token_request tr
+JOIN patient p  ON p.patient_id = tr.patient_id
+JOIN unit un    ON un.unit_id = tr.unit_id
+LEFT JOIN token t    ON t.token_id = tr.token_id
+LEFT JOIN app_user au ON au.user_id = tr.reviewed_by
+ORDER BY tr.request_id;
+```
+
+> That is **24 queries** (incl. Q8b using SOME and Q23 on token_request), comfortably above the required 15, and every sub-item of 8.g
 > (i–viii) is covered (see matrix in Section 11).
 
 ---
@@ -1902,7 +1929,7 @@ with the app producing compliant rows and translating any violation into a frien
 | All general data types | INT, VARCHAR, CHAR, TEXT, NUMERIC, DATE, TIME, TIMESTAMP, BOOLEAN (Sec 4–5) |
 | PK / FK / UNIQUE / CHECK / NOT NULL | every table (Sec 5) |
 | Implement in a DBMS | PostgreSQL (Sec 5–6) |
-| ≥ 15 queries (covering 8.g) | **22 queries** (Sec 8) |
+| ≥ 15 queries (covering 8.g) | **24 queries** (Sec 8) |
 | Non-trivial / canonical-cover FDs | Sec 7 |
 | 8.a description | Sec 1 |
 | 8.b schemas + attributes | Sec 4 |
