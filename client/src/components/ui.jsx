@@ -79,9 +79,43 @@ export function PatientChip({ name, category, sub }) {
    Shared UI primitives — one visual language across every role's pages.
    ──────────────────────────────────────────────────────────────────────────── */
 
+/** Tiny inline trend sparkline (gradient area + line + end dot). Pure SVG so it
+ *  scales to any width and needs no chart library. data: number[] (≥2 points). */
+export function Sparkline({ data = [], width = 84, height = 30, color = '#0d9488', fill = true }) {
+  const nums = (data || []).map(Number).filter((n) => Number.isFinite(n));
+  if (nums.length < 2) return null;
+  const max = Math.max(...nums);
+  const min = Math.min(...nums);
+  const range = max - min || 1;
+  const pad = 3;
+  const stepX = (width - pad * 2) / (nums.length - 1);
+  const pts = nums.map((v, i) => [
+    pad + i * stepX,
+    height - pad - ((v - min) / range) * (height - pad * 2),
+  ]);
+  const line = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  const area = `${line} L${(width - pad).toFixed(1)},${height - pad} L${pad},${height - pad} Z`;
+  const gid = `spark-${color.replace('#', '')}`;
+  const [ex, ey] = pts[pts.length - 1];
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="flex-shrink-0" aria-hidden="true">
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.30" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {fill && <path d={area} fill={`url(#${gid})`} />}
+      <path d={line} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={ex} cy={ey} r="2.4" fill={color} />
+    </svg>
+  );
+}
+
 /** Stat card: display-font number, clickable (arrow appears on hover), optional
- *  live pulse dot next to the label and a small sub-line under the value. */
-export function StatCard({ icon: Icon, label, value, sub, color, onClick, pulse }) {
+ *  live pulse dot next to the label, a small sub-line, and an optional trend
+ *  sparkline (`spark` = number[]) on the right for time-series context. */
+export function StatCard({ icon: Icon, label, value, sub, color, onClick, pulse, spark, sparkColor }) {
   const clickable = typeof onClick === 'function';
   return (
     <div
@@ -106,6 +140,11 @@ export function StatCard({ icon: Icon, label, value, sub, color, onClick, pulse 
         <p className="font-display text-2xl font-bold text-gray-800 leading-tight"><AnimatedNumber value={value} /></p>
         {sub && <p className="text-xs text-gray-400 mt-0.5 truncate">{sub}</p>}
       </div>
+      {spark && spark.length > 1 && (
+        <div className="ml-auto self-center hidden sm:block">
+          <Sparkline data={spark} color={sparkColor || '#0d9488'} />
+        </div>
+      )}
       {clickable && (
         <ArrowUpRight
           size={15}

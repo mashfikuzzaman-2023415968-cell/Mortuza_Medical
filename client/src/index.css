@@ -203,6 +203,16 @@ h1, h2, h3, .font-display { font-family: 'Space Grotesk', 'Inter', sans-serif; }
 /* Gauge track in dark mode */
 .dark .gauge-track { stroke: #253841; }
 
+/* Hover-lift: gentle raise + soft shadow-grow on non-clickable display cards
+   (chart panels, report sections). Clickable StatCards already lift via
+   Tailwind hover utilities; this is for the larger content cards. */
+.lift { transition: transform 0.2s cubic-bezier(0.25, 0.8, 0.35, 1), box-shadow 0.2s ease; }
+.lift:hover { transform: translateY(-3px); box-shadow: 0 14px 28px -12px rgba(2, 32, 42, 0.20); }
+.dark .lift:hover { box-shadow: 0 14px 30px -12px rgba(0, 0, 0, 0.55); }
+@media (prefers-reduced-motion: reduce) {
+  .lift, .lift:hover { transform: none; transition: none; }
+}
+
 /* Skeleton shimmer for loading states */
 .skeleton {
   position: relative; overflow: hidden;
