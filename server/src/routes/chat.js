@@ -1,12 +1,13 @@
 const express = require('express');
+const Anthropic = require('@anthropic-ai/sdk');
 const pool = require('../config/db');
 const { verifyToken, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
-// gemini-2.0-flash has no free-tier quota on the provisioned key; 2.5-flash does.
-const GEMINI_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+// Claude Haiku 4.5 via the official Anthropic SDK. The SDK auto-retries
+// 429/5xx with backoff, so no hand-rolled retry loop is needed.
+const CLAUDE_MODEL = 'claude-haiku-4-5';
 
 function fmtDate(d) {
   if (!d) return null;
@@ -216,7 +217,7 @@ router.post('/', verifyToken, authorize('PATIENT'), async (req, res) => {
     return res.status(400).json({ success: false, error: 'Message is required' });
   }
 
-  if (!process.env.GEMINI_API_KEY) {
+  if (!process.env.ANTHROPIC_API_KEY) {
     return res.status(503).json({ success: false, error: 'Health assistant is temporarily unavailable. Please try again.' });
   }
 
@@ -231,56 +232,50 @@ router.post('/', verifyToken, authorize('PATIENT'), async (req, res) => {
 
   const systemPrompt = buildSystemPrompt(patientData);
 
-  // Keep only the last 20 messages of history, and only valid {role, parts} shapes.
+  // The widget still sends Gemini-style history ({role: 'user'|'model',
+  // parts: [{text}]}); keep that contract and translate to Anthropic's
+  // {role: 'user'|'assistant', content} here so the frontend is untouched.
   const safeHistory = Array.isArray(history)
     ? history
         .filter((h) => h && (h.role === 'user' || h.role === 'model') && Array.isArray(h.parts))
         .slice(-20)
+        .map((h) => ({
+          role: h.role === 'model' ? 'assistant' : 'user',
+          content: h.parts.map((p) => p?.text || '').join('\n').trim() || '…',
+        }))
     : [];
 
-  const requestBody = JSON.stringify({
-    system_instruction: { parts: [{ text: systemPrompt }] },
-    contents: [...safeHistory, { role: 'user', parts: [{ text: message }] }],
-    generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
-  });
-
   try {
-    // Gemini occasionally returns 503 (overloaded) / 429 (rate limit); retry a
-    // couple of times with backoff before falling back to the friendly error.
-    let response;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      response = await fetch(`${GEMINI_URL}?key=${process.env.GEMINI_API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: requestBody,
-      });
-      if (response.ok || (response.status !== 503 && response.status !== 429)) break;
-      if (attempt < 2) await new Promise((r) => setTimeout(r, 700 * (attempt + 1)));
-    }
+    const anthropic = new Anthropic(); // reads ANTHROPIC_API_KEY; retries 429/5xx itself
 
-    if (!response.ok) {
-      console.error('chat: Gemini HTTP', response.status, await response.text().catch(() => ''));
-      return res.status(502).json({ success: false, error: 'Health assistant is temporarily unavailable. Please try again.' });
-    }
+    const response = await anthropic.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 1024,
+      temperature: 0.7,
+      system: systemPrompt,
+      messages: [...safeHistory, { role: 'user', content: message }],
+    });
 
-    const data = await response.json();
-
-    // Safety block (either on the prompt or the candidate).
-    const blocked =
-      data.promptFeedback?.blockReason ||
-      data.candidates?.[0]?.finishReason === 'SAFETY';
-    if (blocked) {
+    // Safety refusal — same friendly copy the widget already handles.
+    if (response.stop_reason === 'refusal') {
       return res.status(200).json({ success: false, error: "I'm unable to respond to that question. Please rephrase." });
     }
 
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const reply = response.content.find((b) => b.type === 'text')?.text;
     if (!reply || !reply.trim()) {
       return res.status(200).json({ success: false, error: "I couldn't generate a response. Please try again." });
     }
 
     return res.json({ success: true, data: { reply } });
   } catch (err) {
-    console.error('chat: Gemini call failed', err);
+    if (err instanceof Anthropic.AuthenticationError) {
+      console.error('chat: Anthropic API key rejected');
+      return res.status(503).json({ success: false, error: 'Health assistant is temporarily unavailable. Please try again.' });
+    }
+    if (err instanceof Anthropic.RateLimitError) {
+      return res.status(502).json({ success: false, error: 'The assistant is busy right now. Please try again in a moment.' });
+    }
+    console.error('chat: Claude call failed', err.status || '', err.message);
     return res.status(502).json({ success: false, error: 'Health assistant is temporarily unavailable. Please try again.' });
   }
 });
