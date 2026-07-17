@@ -1,16 +1,70 @@
-# React + Vite
+# MDC Web Portal — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 + Vite 5 + Tailwind CSS v4 single-page app for the Mortuza Medical Centre
+Management System (MMCMS).
 
-Currently, two official plugins are available:
+> **📖 Full project documentation lives in the [root README](../README.md)** — architecture,
+> database design, API reference, setup, design system and troubleshooting.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Quick start
 
-## React Compiler
+From the **project root** (recommended — starts the API and this app together):
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+make run        # backend :5000 + frontend :5173
+```
 
-## Expanding the ESLint configuration
+Or run just the frontend from this directory:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+npm install
+npm run dev     # http://localhost:5173
+```
+
+The API must be running on `:5000` (`make backend` from the root) or this app will show
+network errors.
+
+## Scripts
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | Vite dev server with HMR (port 5173) |
+| `npm run build` | Production build to `dist/` |
+| `npm run preview` | Serve the built `dist/` locally |
+| `npm run lint` | ESLint |
+
+## Configuration
+
+`client/.env`:
+
+```
+VITE_API_URL=http://localhost:5000/api
+```
+
+## Layout
+
+```
+src/
+├── main.jsx          # AuthProvider + ThemeProvider + router
+├── App.jsx           # Routes, ProtectedRoute / PublicOnlyRoute
+├── index.css         # Design system: typography, dark palette, motion, print rules
+├── api/axios.js      # Bearer-JWT interceptor + 401 session handling
+├── config/roles.js   # ROLES, NAV and role gradients — single source of truth
+├── context/          # AuthContext, ThemeContext
+├── hooks/            # usePatientPhoto
+├── components/       # ui.jsx primitives, DashboardLayout, ChatWidget, QueueBoard,
+│                     # CommandPalette, toast, ConfirmDialog, print modals
+└── pages/            # LoginPage, DashboardHome + one folder per role
+```
+
+## Notes for contributors
+
+- **Dark mode** is class-based (`.dark` on `<html>`), styled via CSS overrides in
+  `index.css` — *not* `dark:` utilities. Add new dark styling there.
+- **Fonts** are loaded via `<link>` in `index.html`, not a CSS `@import` (browsers ignore
+  `@import` after Tailwind's expansion).
+- **Charts**: PostgreSQL returns integers as strings and Recharts won't plot strings —
+  always `Number()`-coerce chart series.
+- **Motion** must degrade under `prefers-reduced-motion`; follow the existing patterns.
+- **Print views**: see §2.7 of the root README before adding one — there are real
+  animation/`display:none` traps that produce blank pages.
